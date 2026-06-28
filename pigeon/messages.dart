@@ -116,9 +116,9 @@ class PrintOptions {
     this.printerAddress,
     this.pageSize,
     this.margins,
-    this.copies = 1,
-    this.landscape = false,
-    this.color = false,
+    this.copies,
+    this.landscape,
+    this.color,
     this.duplexMode,
   });
 
@@ -145,14 +145,19 @@ class PrintOptions {
 
   /// Number of copies to print. Must be ≥ 1.
   ///
+  /// When `null` the platform/printer default is used.
   /// Ignored on iOS (controlled by the system dialog).
-  final int copies;
+  final int? copies;
 
   /// Whether to print in landscape orientation.
-  final bool landscape;
+  ///
+  /// When `null` the platform/printer default orientation is used.
+  final bool? landscape;
 
   /// Whether to print in colour. Set to `false` for greyscale/monochrome.
-  final bool color;
+  ///
+  /// When `null` the platform/printer default colour mode is used.
+  final bool? color;
 
   /// Duplex (double-sided) printing mode.
   ///

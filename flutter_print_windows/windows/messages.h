@@ -191,19 +191,16 @@ class PageMargins {
 class PrintOptions {
  public:
   // Constructs an object setting all non-nullable fields.
-  explicit PrintOptions(
-    int64_t copies,
-    bool landscape,
-    bool color);
+  PrintOptions();
 
   // Constructs an object setting all fields.
   explicit PrintOptions(
     const std::string* printer_address,
     const PageSize* page_size,
     const PageMargins* margins,
-    int64_t copies,
-    bool landscape,
-    bool color,
+    const int64_t* copies,
+    const bool* landscape,
+    const bool* color,
     const DuplexMode* duplex_mode);
 
   ~PrintOptions() = default;
@@ -240,16 +237,24 @@ class PrintOptions {
 
   // Number of copies to print. Must be ≥ 1.
   //
+  // When `null` the platform/printer default is used.
   // Ignored on iOS (controlled by the system dialog).
-  int64_t copies() const;
+  const int64_t* copies() const;
+  void set_copies(const int64_t* value_arg);
   void set_copies(int64_t value_arg);
 
   // Whether to print in landscape orientation.
-  bool landscape() const;
+  //
+  // When `null` the platform/printer default orientation is used.
+  const bool* landscape() const;
+  void set_landscape(const bool* value_arg);
   void set_landscape(bool value_arg);
 
   // Whether to print in colour. Set to `false` for greyscale/monochrome.
-  bool color() const;
+  //
+  // When `null` the platform/printer default colour mode is used.
+  const bool* color() const;
+  void set_color(const bool* value_arg);
   void set_color(bool value_arg);
 
   // Duplex (double-sided) printing mode.
@@ -275,9 +280,9 @@ class PrintOptions {
   std::optional<std::string> printer_address_;
   std::unique_ptr<PageSize> page_size_;
   std::unique_ptr<PageMargins> margins_;
-  int64_t copies_;
-  bool landscape_;
-  bool color_;
+  std::optional<int64_t> copies_;
+  std::optional<bool> landscape_;
+  std::optional<bool> color_;
   std::optional<DuplexMode> duplex_mode_;
 };
 

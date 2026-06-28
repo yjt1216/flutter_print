@@ -78,14 +78,13 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
   if (GetFileAttributesW(wPath.c_str()) == INVALID_FILE_ATTRIBUTES)
     return FlutterError("FILE_NOT_FOUND", "File not found: " + file_path);
 
-  static const PrintOptions kDefaults(1, false, true);
-  const PrintOptions& opts = options ? *options : kDefaults;
-
+  // When options is null the caller wants the printer's default settings; pass
+  // it through untouched so no DEVMODE overrides are applied.
   const std::string mime = GetMimeType(wPath);
   if (mime.rfind("image/", 0) == 0 || mime == "application/pdf" ||
       mime.rfind("text/", 0) == 0) {
     std::wstring wPrinter;
-    const std::string* pn = opts.printer_address();
+    const std::string* pn = options ? options->printer_address() : nullptr;
     if (pn && !pn->empty()) {
       wPrinter = Utf8ToWide(*pn);
     } else {
@@ -98,7 +97,7 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
       return FlutterError("PRINTER_ERROR", "No printer available");
 
     int softwareCopies = 1;
-    HDC hdc = CreatePrinterDC(wPrinter, opts, &softwareCopies);
+    HDC hdc = CreatePrinterDC(wPrinter, options, &softwareCopies);
     if (!hdc)
       return FlutterError("PRINTER_ERROR",
                           "Cannot create printer DC for: " +
@@ -107,7 +106,7 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
   }
 
   // Other file types: delegate to the file's associated application.
-  const std::string* pn = opts.printer_address();
+  const std::string* pn = options ? options->printer_address() : nullptr;
   const std::wstring wPrinter = (pn && !pn->empty()) ? Utf8ToWide(*pn) : std::wstring{};
   return RenderOrFallback(nullptr, wPath, wPrinter);
 }

@@ -47,10 +47,24 @@ int GetDriverMaxCopies(const std::wstring& printerName) {
 
 void ApplyOptionsToDEVMODE(DEVMODE* dm, const PrintOptions& options,
                            int deviceCopies) {
-  dm->dmCopies      = static_cast<short>(std::max(1, deviceCopies));
-  dm->dmOrientation = options.landscape() ? DMORIENT_LANDSCAPE : DMORIENT_PORTRAIT;
-  dm->dmColor       = options.color()     ? DMCOLOR_COLOR      : DMCOLOR_MONOCHROME;
-  dm->dmFields     |= DM_COPIES | DM_ORIENTATION | DM_COLOR;
+  // Each field is applied only when provided; unset (null) fields keep the
+  // printer's default DEVMODE value.
+  if (options.copies()) {
+    dm->dmCopies  = static_cast<short>(std::max(1, deviceCopies));
+    dm->dmFields |= DM_COPIES;
+  }
+
+  const bool* landscape = options.landscape();
+  if (landscape) {
+    dm->dmOrientation = *landscape ? DMORIENT_LANDSCAPE : DMORIENT_PORTRAIT;
+    dm->dmFields     |= DM_ORIENTATION;
+  }
+
+  const bool* color = options.color();
+  if (color) {
+    dm->dmColor   = *color ? DMCOLOR_COLOR : DMCOLOR_MONOCHROME;
+    dm->dmFields |= DM_COLOR;
+  }
 
   const DuplexMode* dup = options.duplex_mode();
   if (dup) {
@@ -96,14 +110,17 @@ void ApplyOptionsToDEVMODE(DEVMODE* dm, const PrintOptions& options,
 }
 
 HGLOBAL BuildDevMode(const std::wstring& printerName,
-                     const PrintOptions& options,
+                     const PrintOptions* options,
                      int* out_software_copies) {
   // Split the requested copies between the driver (dmCopies) and software
   // emission. Drivers that cannot replicate copies natively report
   // DC_COPIES == 1 and silently drop dmCopies > 1, so in that case we ask the
   // driver for a single copy and let the renderer emit the rest.
-  const int requestedCopies = static_cast<int>(
-      std::max<int64_t>(1, options.copies()));
+  // When copies is unset, leave it to the printer default (1).
+  const int64_t* copiesOpt = options ? options->copies() : nullptr;
+  const int requestedCopies = copiesOpt
+      ? static_cast<int>(std::max<int64_t>(1, *copiesOpt))
+      : 1;
   const int maxDriverCopies = GetDriverMaxCopies(printerName);
   const bool driverHandlesAll = maxDriverCopies >= requestedCopies;
   const int deviceCopies   = driverHandlesAll ? requestedCopies : 1;
@@ -134,14 +151,17 @@ HGLOBAL BuildDevMode(const std::wstring& printerName,
     return nullptr;
   }
 
-  ApplyOptionsToDEVMODE(dm, options, deviceCopies);
-  // Let the driver validate and normalise our changes; without this round-trip
-  // many drivers silently ignore the modified DEVMODE and produce a blank job.
-  // On failure, proceed with the modified-but-unvalidated DEVMODE — CreateDCW
-  // will re-validate, and it is still better than falling back to defaults.
-  DocumentPropertiesW(nullptr, hPrinter,
-                       const_cast<LPWSTR>(printerName.c_str()),
-                       dm, dm, DM_IN_BUFFER | DM_OUT_BUFFER);
+  // With no options, keep the printer's default DEVMODE (system defaults).
+  if (options) {
+    ApplyOptionsToDEVMODE(dm, *options, deviceCopies);
+    // Let the driver validate and normalise our changes; without this round-trip
+    // many drivers silently ignore the modified DEVMODE and produce a blank job.
+    // On failure, proceed with the modified-but-unvalidated DEVMODE — CreateDCW
+    // will re-validate, and it is still better than falling back to defaults.
+    DocumentPropertiesW(nullptr, hPrinter,
+                         const_cast<LPWSTR>(printerName.c_str()),
+                         dm, dm, DM_IN_BUFFER | DM_OUT_BUFFER);
+  }
   GlobalUnlock(h);
   ClosePrinter(hPrinter);
   return h;
@@ -152,7 +172,7 @@ HGLOBAL BuildDevMode(const std::wstring& printerName,
 // ---------------------------------------------------------------------------
 
 HDC CreatePrinterDC(const std::wstring& printerName,
-                    const PrintOptions& options,
+                    const PrintOptions* options,
                     int* out_software_copies) {
   HGLOBAL h  = BuildDevMode(printerName, options, out_software_copies);
   auto*   dm = h ? static_cast<DEVMODE*>(GlobalLock(h)) : nullptr;

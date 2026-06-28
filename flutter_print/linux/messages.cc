@@ -561,9 +561,9 @@ struct _FlutterPrintPrintOptions {
   gchar* printer_address;
   FlutterPrintPageSize* page_size;
   FlutterPrintPageMargins* margins;
-  int64_t copies;
-  gboolean landscape;
-  gboolean color;
+  int64_t* copies;
+  gboolean* landscape;
+  gboolean* color;
   FlutterPrintDuplexMode* duplex_mode;
 };
 
@@ -574,6 +574,9 @@ static void flutter_print_print_options_dispose(GObject* object) {
   g_clear_pointer(&self->printer_address, g_free);
   g_clear_object(&self->page_size);
   g_clear_object(&self->margins);
+  g_clear_pointer(&self->copies, g_free);
+  g_clear_pointer(&self->landscape, g_free);
+  g_clear_pointer(&self->color, g_free);
   g_clear_pointer(&self->duplex_mode, g_free);
   G_OBJECT_CLASS(flutter_print_print_options_parent_class)->dispose(object);
 }
@@ -585,7 +588,7 @@ static void flutter_print_print_options_class_init(FlutterPrintPrintOptionsClass
   G_OBJECT_CLASS(klass)->dispose = flutter_print_print_options_dispose;
 }
 
-FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t copies, gboolean landscape, gboolean color, FlutterPrintDuplexMode* duplex_mode) {
+FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode) {
   FlutterPrintPrintOptions* self = FLUTTER_PRINT_PRINT_OPTIONS(g_object_new(flutter_print_print_options_get_type(), nullptr));
   if (printer_address != nullptr) {
     self->printer_address = g_strdup(printer_address);
@@ -605,9 +608,27 @@ FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_a
   else {
     self->margins = nullptr;
   }
-  self->copies = copies;
-  self->landscape = landscape;
-  self->color = color;
+  if (copies != nullptr) {
+    self->copies = static_cast<int64_t*>(malloc(sizeof(int64_t)));
+    *self->copies = *copies;
+  }
+  else {
+    self->copies = nullptr;
+  }
+  if (landscape != nullptr) {
+    self->landscape = static_cast<gboolean*>(malloc(sizeof(gboolean)));
+    *self->landscape = *landscape;
+  }
+  else {
+    self->landscape = nullptr;
+  }
+  if (color != nullptr) {
+    self->color = static_cast<gboolean*>(malloc(sizeof(gboolean)));
+    *self->color = *color;
+  }
+  else {
+    self->color = nullptr;
+  }
   if (duplex_mode != nullptr) {
     self->duplex_mode = static_cast<FlutterPrintDuplexMode*>(malloc(sizeof(FlutterPrintDuplexMode)));
     *self->duplex_mode = *duplex_mode;
@@ -633,18 +654,18 @@ FlutterPrintPageMargins* flutter_print_print_options_get_margins(FlutterPrintPri
   return self->margins;
 }
 
-int64_t flutter_print_print_options_get_copies(FlutterPrintPrintOptions* self) {
-  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), 0);
+int64_t* flutter_print_print_options_get_copies(FlutterPrintPrintOptions* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), nullptr);
   return self->copies;
 }
 
-gboolean flutter_print_print_options_get_landscape(FlutterPrintPrintOptions* self) {
-  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), FALSE);
+gboolean* flutter_print_print_options_get_landscape(FlutterPrintPrintOptions* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), nullptr);
   return self->landscape;
 }
 
-gboolean flutter_print_print_options_get_color(FlutterPrintPrintOptions* self) {
-  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), FALSE);
+gboolean* flutter_print_print_options_get_color(FlutterPrintPrintOptions* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), nullptr);
   return self->color;
 }
 
@@ -658,9 +679,9 @@ static FlValue* flutter_print_print_options_to_list(FlutterPrintPrintOptions* se
   fl_value_append_take(values, self->printer_address != nullptr ? fl_value_new_string(self->printer_address) : fl_value_new_null());
   fl_value_append_take(values, self->page_size != nullptr ? fl_value_new_custom_object(flutter_print_page_size_type_id, G_OBJECT(self->page_size)) : fl_value_new_null());
   fl_value_append_take(values, self->margins != nullptr ? fl_value_new_custom_object(flutter_print_page_margins_type_id, G_OBJECT(self->margins)) : fl_value_new_null());
-  fl_value_append_take(values, fl_value_new_int(self->copies));
-  fl_value_append_take(values, fl_value_new_bool(self->landscape));
-  fl_value_append_take(values, fl_value_new_bool(self->color));
+  fl_value_append_take(values, self->copies != nullptr ? fl_value_new_int(*self->copies) : fl_value_new_null());
+  fl_value_append_take(values, self->landscape != nullptr ? fl_value_new_bool(*self->landscape) : fl_value_new_null());
+  fl_value_append_take(values, self->color != nullptr ? fl_value_new_bool(*self->color) : fl_value_new_null());
   fl_value_append_take(values, self->duplex_mode != nullptr ? fl_value_new_custom(flutter_print_duplex_mode_type_id, fl_value_new_int(*self->duplex_mode), (GDestroyNotify)fl_value_unref) : fl_value_new_null());
   return values;
 }
@@ -682,11 +703,26 @@ static FlutterPrintPrintOptions* flutter_print_print_options_new_from_list(FlVal
     margins = FLUTTER_PRINT_PAGE_MARGINS(fl_value_get_custom_value_object(value2));
   }
   FlValue* value3 = fl_value_get_list_value(values, 3);
-  int64_t copies = fl_value_get_int(value3);
+  int64_t* copies = nullptr;
+  int64_t copies_value;
+  if (fl_value_get_type(value3) != FL_VALUE_TYPE_NULL) {
+    copies_value = fl_value_get_int(value3);
+    copies = &copies_value;
+  }
   FlValue* value4 = fl_value_get_list_value(values, 4);
-  gboolean landscape = fl_value_get_bool(value4);
+  gboolean* landscape = nullptr;
+  gboolean landscape_value;
+  if (fl_value_get_type(value4) != FL_VALUE_TYPE_NULL) {
+    landscape_value = fl_value_get_bool(value4);
+    landscape = &landscape_value;
+  }
   FlValue* value5 = fl_value_get_list_value(values, 5);
-  gboolean color = fl_value_get_bool(value5);
+  gboolean* color = nullptr;
+  gboolean color_value;
+  if (fl_value_get_type(value5) != FL_VALUE_TYPE_NULL) {
+    color_value = fl_value_get_bool(value5);
+    color = &color_value;
+  }
   FlValue* value6 = fl_value_get_list_value(values, 6);
   FlutterPrintDuplexMode* duplex_mode = nullptr;
   FlutterPrintDuplexMode duplex_mode_value;
@@ -713,13 +749,22 @@ gboolean flutter_print_print_options_equals(FlutterPrintPrintOptions* a, Flutter
   if (!flutter_print_page_margins_equals(a->margins, b->margins)) {
     return FALSE;
   }
-  if (a->copies != b->copies) {
+  if ((a->copies == nullptr) != (b->copies == nullptr)) {
     return FALSE;
   }
-  if (a->landscape != b->landscape) {
+  if (a->copies != nullptr && *a->copies != *b->copies) {
     return FALSE;
   }
-  if (a->color != b->color) {
+  if ((a->landscape == nullptr) != (b->landscape == nullptr)) {
+    return FALSE;
+  }
+  if (a->landscape != nullptr && *a->landscape != *b->landscape) {
+    return FALSE;
+  }
+  if ((a->color == nullptr) != (b->color == nullptr)) {
+    return FALSE;
+  }
+  if (a->color != nullptr && *a->color != *b->color) {
     return FALSE;
   }
   if ((a->duplex_mode == nullptr) != (b->duplex_mode == nullptr)) {
@@ -737,9 +782,9 @@ guint flutter_print_print_options_hash(FlutterPrintPrintOptions* self) {
   result = result * 31 + (self->printer_address != nullptr ? g_str_hash(self->printer_address) : 0);
   result = result * 31 + flutter_print_page_size_hash(self->page_size);
   result = result * 31 + flutter_print_page_margins_hash(self->margins);
-  result = result * 31 + static_cast<guint>(self->copies);
-  result = result * 31 + static_cast<guint>(self->landscape);
-  result = result * 31 + static_cast<guint>(self->color);
+  result = result * 31 + (self->copies != nullptr ? static_cast<guint>(*self->copies) : 0);
+  result = result * 31 + (self->landscape != nullptr ? static_cast<guint>(*self->landscape) : 0);
+  result = result * 31 + (self->color != nullptr ? static_cast<guint>(*self->color) : 0);
   result = result * 31 + (self->duplex_mode != nullptr ? static_cast<guint>(*self->duplex_mode) : 0);
   return result;
 }
@@ -773,11 +818,26 @@ gchar* flutter_print_print_options_to_string(FlutterPrintPrintOptions* self) {
     g_string_append(str, "null");
   }
   g_string_append(str, ", copies: ");
-  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->copies);
+  if (self->copies != nullptr) {
+    g_string_append_printf(str, "%" G_GINT64_FORMAT, *self->copies);
+  }
+  else {
+    g_string_append(str, "null");
+  }
   g_string_append(str, ", landscape: ");
-  g_string_append(str, self->landscape ? "true" : "false");
+  if (self->landscape != nullptr) {
+    g_string_append(str, *self->landscape ? "true" : "false");
+  }
+  else {
+    g_string_append(str, "null");
+  }
   g_string_append(str, ", color: ");
-  g_string_append(str, self->color ? "true" : "false");
+  if (self->color != nullptr) {
+    g_string_append(str, *self->color ? "true" : "false");
+  }
+  else {
+    g_string_append(str, "null");
+  }
   g_string_append(str, ", duplex_mode: ");
   if (self->duplex_mode != nullptr) {
     g_string_append_printf(str, "%d", static_cast<int>(*self->duplex_mode));

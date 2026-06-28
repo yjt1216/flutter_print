@@ -42,20 +42,23 @@ void ApplyOptionsToDEVMODE(DEVMODE* dm, const PrintOptions& options,
 
 // Returns a GlobalAlloc'd DEVMODE initialised from the printer's native
 // settings with |options| overlaid. Caller must GlobalFree the handle.
+// When |options| is null no overrides are applied and the printer's default
+// DEVMODE is returned unchanged (system default settings).
 // When |out_software_copies| is non-null it receives the number of copies that
 // must be produced in software because the driver cannot replicate them
 // natively (1 when the driver handles all requested copies).
-HGLOBAL BuildDevMode(const std::wstring& printerName, const PrintOptions& options,
+HGLOBAL BuildDevMode(const std::wstring& printerName, const PrintOptions* options,
                      int* out_software_copies = nullptr);
 
 // ---------------------------------------------------------------------------
 // Printer DC
 // ---------------------------------------------------------------------------
 
-// Creates a printer DC for |printerName| with |options| applied.
+// Creates a printer DC for |printerName| with |options| applied. When |options|
+// is null the printer's default settings are used unchanged.
 // Caller must DeleteDC the returned handle. |out_software_copies| has the same
 // meaning as in BuildDevMode.
-HDC CreatePrinterDC(const std::wstring& printerName, const PrintOptions& options,
+HDC CreatePrinterDC(const std::wstring& printerName, const PrintOptions* options,
                     int* out_software_copies = nullptr);
 
 // ---------------------------------------------------------------------------

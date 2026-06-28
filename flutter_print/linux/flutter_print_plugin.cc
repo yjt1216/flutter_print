@@ -95,8 +95,10 @@ static void handle_print(
   }
 
 #ifdef HAS_CUPS
+  // options may be null when the caller omits them; in that case no CUPS
+  // options are added and the printer's default settings apply.
   const gchar* printer_address =
-      flutter_print_print_options_get_printer_address(options);
+      options ? flutter_print_print_options_get_printer_address(options) : nullptr;
   const gchar* dest = (printer_address && printer_address[0] != '\0')
                           ? printer_address
                           : cupsGetDefault();
@@ -104,27 +106,32 @@ static void handle_print(
   int num_options = 0;
   cups_option_t* cups_opts = nullptr;
 
-  gint64 copies = flutter_print_print_options_get_copies(options);
-  if (copies > 1) {
-    gchar* s = g_strdup_printf("%" G_GINT64_FORMAT, copies);
+  const int64_t* copies =
+      options ? flutter_print_print_options_get_copies(options) : nullptr;
+  if (copies && *copies > 1) {
+    gchar* s = g_strdup_printf("%" G_GINT64_FORMAT, *copies);
     num_options = cupsAddOption("copies", s, num_options, &cups_opts);
     g_free(s);
   }
 
   // Use the IPP-standard attribute (3=portrait, 4=landscape) instead of the
   // legacy CUPS-only "landscape" shorthand.
-  if (flutter_print_print_options_get_landscape(options)) {
+  const gboolean* landscape =
+      options ? flutter_print_print_options_get_landscape(options) : nullptr;
+  if (landscape && *landscape) {
     num_options = cupsAddOption("orientation-requested", "4",
                                 num_options, &cups_opts);
   }
 
-  if (!flutter_print_print_options_get_color(options)) {
+  const gboolean* color =
+      options ? flutter_print_print_options_get_color(options) : nullptr;
+  if (color && !*color) {
     num_options = cupsAddOption("print-color-mode", "monochrome",
                                 num_options, &cups_opts);
   }
 
   FlutterPrintDuplexMode* duplex_mode =
-      flutter_print_print_options_get_duplex_mode(options);
+      options ? flutter_print_print_options_get_duplex_mode(options) : nullptr;
   if (duplex_mode) {
     const char* sides = nullptr;
     switch (*duplex_mode) {
@@ -140,7 +147,7 @@ static void handle_print(
   }
 
   FlutterPrintPageSize* page_size =
-      flutter_print_print_options_get_page_size(options);
+      options ? flutter_print_print_options_get_page_size(options) : nullptr;
   if (page_size) {
     const gchar* size_name = flutter_print_page_size_get_name(page_size);
     if (size_name && size_name[0] != '\0') {
@@ -184,16 +191,23 @@ static void handle_print(
 #else
   // No CUPS at build time: use the lp command-line tool.
   // Build argv safely — no shell, no injection risk.
+  // options may be null when the caller omits them; in that case no lp options
+  // are passed and the printer's default settings apply.
   const gchar* printer_address =
-      flutter_print_print_options_get_printer_address(options);
-  gint64 copies = flutter_print_print_options_get_copies(options);
+      options ? flutter_print_print_options_get_printer_address(options) : nullptr;
+  const int64_t* copies =
+      options ? flutter_print_print_options_get_copies(options) : nullptr;
+  const gboolean* landscape =
+      options ? flutter_print_print_options_get_landscape(options) : nullptr;
+  const gboolean* color =
+      options ? flutter_print_print_options_get_color(options) : nullptr;
 
   // Heap-allocated strings that must outlive the spawn call.
-  gchar* copies_str = copies > 1
-      ? g_strdup_printf("%" G_GINT64_FORMAT, copies) : nullptr;
+  gchar* copies_str = (copies && *copies > 1)
+      ? g_strdup_printf("%" G_GINT64_FORMAT, *copies) : nullptr;
 
   FlutterPrintDuplexMode* duplex_mode =
-      flutter_print_print_options_get_duplex_mode(options);
+      options ? flutter_print_print_options_get_duplex_mode(options) : nullptr;
   const char* sides = nullptr;
   if (duplex_mode) {
     switch (*duplex_mode) {
@@ -216,11 +230,11 @@ static void handle_print(
     g_ptr_array_add(argv, const_cast<gchar*>("-n"));
     g_ptr_array_add(argv, copies_str);
   }
-  if (flutter_print_print_options_get_landscape(options)) {
+  if (landscape && *landscape) {
     g_ptr_array_add(argv, const_cast<gchar*>("-o"));
     g_ptr_array_add(argv, const_cast<gchar*>("orientation-requested=4"));
   }
-  if (!flutter_print_print_options_get_color(options)) {
+  if (color && !*color) {
     g_ptr_array_add(argv, const_cast<gchar*>("-o"));
     g_ptr_array_add(argv, const_cast<gchar*>("print-color-mode=monochrome"));
   }

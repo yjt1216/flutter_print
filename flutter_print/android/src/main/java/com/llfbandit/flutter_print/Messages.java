@@ -596,46 +596,46 @@ public class Messages {
     /**
      * Number of copies to print. Must be ≥ 1.
      *
+     * When `null` the platform/printer default is used.
      * Ignored on iOS (controlled by the system dialog).
      */
-    private @NonNull Long copies;
+    private @Nullable Long copies;
 
-    public @NonNull Long getCopies() {
+    public @Nullable Long getCopies() {
       return copies;
     }
 
-    public void setCopies(@NonNull Long setterArg) {
-      if (setterArg == null) {
-        throw new IllegalStateException("Nonnull field \"copies\" is null.");
-      }
+    public void setCopies(@Nullable Long setterArg) {
       this.copies = setterArg;
     }
 
-    /** Whether to print in landscape orientation. */
-    private @NonNull Boolean landscape;
+    /**
+     * Whether to print in landscape orientation.
+     *
+     * When `null` the platform/printer default orientation is used.
+     */
+    private @Nullable Boolean landscape;
 
-    public @NonNull Boolean getLandscape() {
+    public @Nullable Boolean getLandscape() {
       return landscape;
     }
 
-    public void setLandscape(@NonNull Boolean setterArg) {
-      if (setterArg == null) {
-        throw new IllegalStateException("Nonnull field \"landscape\" is null.");
-      }
+    public void setLandscape(@Nullable Boolean setterArg) {
       this.landscape = setterArg;
     }
 
-    /** Whether to print in colour. Set to `false` for greyscale/monochrome. */
-    private @NonNull Boolean color;
+    /**
+     * Whether to print in colour. Set to `false` for greyscale/monochrome.
+     *
+     * When `null` the platform/printer default colour mode is used.
+     */
+    private @Nullable Boolean color;
 
-    public @NonNull Boolean getColor() {
+    public @Nullable Boolean getColor() {
       return color;
     }
 
-    public void setColor(@NonNull Boolean setterArg) {
-      if (setterArg == null) {
-        throw new IllegalStateException("Nonnull field \"color\" is null.");
-      }
+    public void setColor(@Nullable Boolean setterArg) {
       this.color = setterArg;
     }
 
@@ -655,9 +655,6 @@ public class Messages {
     public void setDuplexMode(@Nullable DuplexMode setterArg) {
       this.duplexMode = setterArg;
     }
-
-    /** Constructor is non-public to enforce null safety; use Builder. */
-    PrintOptions() {}
 
     @Override
     public boolean equals(Object o) {
@@ -707,7 +704,7 @@ public class Messages {
       private @Nullable Long copies;
 
       @CanIgnoreReturnValue
-      public @NonNull Builder setCopies(@NonNull Long setterArg) {
+      public @NonNull Builder setCopies(@Nullable Long setterArg) {
         this.copies = setterArg;
         return this;
       }
@@ -715,7 +712,7 @@ public class Messages {
       private @Nullable Boolean landscape;
 
       @CanIgnoreReturnValue
-      public @NonNull Builder setLandscape(@NonNull Boolean setterArg) {
+      public @NonNull Builder setLandscape(@Nullable Boolean setterArg) {
         this.landscape = setterArg;
         return this;
       }
@@ -723,7 +720,7 @@ public class Messages {
       private @Nullable Boolean color;
 
       @CanIgnoreReturnValue
-      public @NonNull Builder setColor(@NonNull Boolean setterArg) {
+      public @NonNull Builder setColor(@Nullable Boolean setterArg) {
         this.color = setterArg;
         return this;
       }

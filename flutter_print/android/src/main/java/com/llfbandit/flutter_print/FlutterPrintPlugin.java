@@ -114,7 +114,7 @@ public class FlutterPrintPlugin
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private void handlePrint(@NonNull String filePath, @NonNull Messages.PrintOptions options) {
+  private void handlePrint(@NonNull String filePath, @Nullable Messages.PrintOptions options) {
     if (activity == null) {
       throw new Messages.FlutterError("NO_ACTIVITY", "Printing requires an active Activity", null);
     }
@@ -126,42 +126,50 @@ public class FlutterPrintPlugin
 
     PrintAttributes.Builder attrBuilder = new PrintAttributes.Builder();
 
-    Boolean landscape = options.getLandscape();
-    Messages.PageSize pageSize = options.getPageSize();
+    // When options are omitted, leave PrintAttributes empty so the system /
+    // printer default settings apply.
+    if (options != null) {
+      // Each field is applied only when provided; unset fields keep the
+      // system / printer default. A null landscape is treated as portrait.
+      boolean landscape = Boolean.TRUE.equals(options.getLandscape());
+      Messages.PageSize pageSize = options.getPageSize();
 
-    if (pageSize != null) {
-      PrintAttributes.MediaSize mediaSize = resolveMediaSize(pageSize);
-      if (mediaSize != null) {
-        attrBuilder.setMediaSize(
-            landscape ? mediaSize.asLandscape() : mediaSize.asPortrait());
+      if (pageSize != null) {
+        PrintAttributes.MediaSize mediaSize = resolveMediaSize(pageSize);
+        if (mediaSize != null) {
+          attrBuilder.setMediaSize(
+              landscape ? mediaSize.asLandscape() : mediaSize.asPortrait());
+        } else if (landscape) {
+          attrBuilder.setMediaSize(PrintAttributes.MediaSize.UNKNOWN_LANDSCAPE);
+        }
       } else if (landscape) {
         attrBuilder.setMediaSize(PrintAttributes.MediaSize.UNKNOWN_LANDSCAPE);
       }
-    } else if (landscape) {
-      attrBuilder.setMediaSize(PrintAttributes.MediaSize.UNKNOWN_LANDSCAPE);
-    }
 
-    Boolean color = options.getColor();
-    attrBuilder.setColorMode(
-        color ? PrintAttributes.COLOR_MODE_COLOR : PrintAttributes.COLOR_MODE_MONOCHROME);
-
-    Messages.DuplexMode duplexMode = options.getDuplexMode();
-    if (duplexMode != null) {
-      switch (duplexMode) {
-        case NONE:       attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_NONE);       break;
-        case LONG_EDGE:  attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_LONG_EDGE);  break;
-        case SHORT_EDGE: attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_SHORT_EDGE); break;
+      Boolean color = options.getColor();
+      if (color != null) {
+        attrBuilder.setColorMode(
+            color ? PrintAttributes.COLOR_MODE_COLOR : PrintAttributes.COLOR_MODE_MONOCHROME);
       }
-    }
 
-    Messages.PageMargins margins = options.getMargins();
-    if (margins != null) {
-      // Android uses mils (1/1000 inch). 1 mm ≈ 39.37 mils.
-      attrBuilder.setMinMargins(new PrintAttributes.Margins(
-          mmToMils(margins.getLeft()),
-          mmToMils(margins.getTop()),
-          mmToMils(margins.getRight()),
-          mmToMils(margins.getBottom())));
+      Messages.DuplexMode duplexMode = options.getDuplexMode();
+      if (duplexMode != null) {
+        switch (duplexMode) {
+          case NONE:       attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_NONE);       break;
+          case LONG_EDGE:  attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_LONG_EDGE);  break;
+          case SHORT_EDGE: attrBuilder.setDuplexMode(PrintAttributes.DUPLEX_MODE_SHORT_EDGE); break;
+        }
+      }
+
+      Messages.PageMargins margins = options.getMargins();
+      if (margins != null) {
+        // Android uses mils (1/1000 inch). 1 mm ≈ 39.37 mils.
+        attrBuilder.setMinMargins(new PrintAttributes.Margins(
+            mmToMils(margins.getLeft()),
+            mmToMils(margins.getTop()),
+            mmToMils(margins.getRight()),
+            mmToMils(margins.getBottom())));
+      }
     }
 
     PrintManager pm = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);

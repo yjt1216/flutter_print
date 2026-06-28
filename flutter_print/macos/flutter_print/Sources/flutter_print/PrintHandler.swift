@@ -102,8 +102,13 @@ extension FlutterPrintPlugin {
 
   private func buildPrintInfo(options: PrintOptions?) -> NSPrintInfo {
     let info = NSPrintInfo.shared.copy() as! NSPrintInfo
+
+    // Each option is applied only when provided; unset fields keep the system
+    // default print settings.
     let isLandscape = options?.landscape ?? false
-    info.orientation = isLandscape ? .landscape : .portrait
+    if let landscape = options?.landscape {
+      info.orientation = landscape ? .landscape : .portrait
+    }
 
     if let duplex = options?.duplexMode {
       let mode: PMDuplexMode
@@ -152,8 +157,10 @@ extension FlutterPrintPlugin {
       info.rightMargin = 0
     }
 
-    PMSetCopies(OpaquePointer(info.pmPrintSettings()), UInt32(options?.copies ?? 1), false)
-    info.updateFromPMPrintSettings()
+    if let copies = options?.copies {
+      PMSetCopies(OpaquePointer(info.pmPrintSettings()), UInt32(copies), false)
+      info.updateFromPMPrintSettings()
+    }
 
     if let name = options?.printerAddress, let printer = NSPrinter(name: name) {
       info.printer = printer
@@ -243,8 +250,8 @@ extension FlutterPrintPlugin {
     if let addr = options?.printerAddress, !addr.isEmpty {
       args += ["-d", addr]
     }
-    if (options?.copies ?? 1) > 1 {
-      args += ["-n", "\(options!.copies)"]
+    if let copies = options?.copies, copies > 1 {
+      args += ["-n", "\(copies)"]
     }
     if options?.landscape == true {
       args += ["-o", "orientation-requested=4"]

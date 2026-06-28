@@ -252,7 +252,7 @@ G_DECLARE_FINAL_TYPE(FlutterPrintPrintOptions, flutter_print_print_options, FLUT
  *
  * Returns: a new #FlutterPrintPrintOptions
  */
-FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t copies, gboolean landscape, gboolean color, FlutterPrintDuplexMode* duplex_mode);
+FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode);
 
 /**
  * flutter_print_print_options_get_printer_address
@@ -302,11 +302,12 @@ FlutterPrintPageMargins* flutter_print_print_options_get_margins(FlutterPrintPri
  *
  * Number of copies to print. Must be ≥ 1.
  *
+ * When `null` the platform/printer default is used.
  * Ignored on iOS (controlled by the system dialog).
  *
  * Returns: the field value.
  */
-int64_t flutter_print_print_options_get_copies(FlutterPrintPrintOptions* object);
+int64_t* flutter_print_print_options_get_copies(FlutterPrintPrintOptions* object);
 
 /**
  * flutter_print_print_options_get_landscape
@@ -314,9 +315,11 @@ int64_t flutter_print_print_options_get_copies(FlutterPrintPrintOptions* object)
  *
  * Whether to print in landscape orientation.
  *
+ * When `null` the platform/printer default orientation is used.
+ *
  * Returns: the field value.
  */
-gboolean flutter_print_print_options_get_landscape(FlutterPrintPrintOptions* object);
+gboolean* flutter_print_print_options_get_landscape(FlutterPrintPrintOptions* object);
 
 /**
  * flutter_print_print_options_get_color
@@ -324,9 +327,11 @@ gboolean flutter_print_print_options_get_landscape(FlutterPrintPrintOptions* obj
  *
  * Whether to print in colour. Set to `false` for greyscale/monochrome.
  *
+ * When `null` the platform/printer default colour mode is used.
+ *
  * Returns: the field value.
  */
-gboolean flutter_print_print_options_get_color(FlutterPrintPrintOptions* object);
+gboolean* flutter_print_print_options_get_color(FlutterPrintPrintOptions* object);
 
 /**
  * flutter_print_print_options_get_duplex_mode

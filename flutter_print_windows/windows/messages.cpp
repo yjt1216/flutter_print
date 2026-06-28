@@ -540,37 +540,31 @@ size_t PigeonInternalDeepHash(const PageMargins& v) {
 
 // PrintOptions
 
-PrintOptions::PrintOptions(
-  int64_t copies,
-  bool landscape,
-  bool color)
- : copies_(copies),
-    landscape_(landscape),
-    color_(color) {}
+PrintOptions::PrintOptions() {}
 
 PrintOptions::PrintOptions(
   const std::string* printer_address,
   const PageSize* page_size,
   const PageMargins* margins,
-  int64_t copies,
-  bool landscape,
-  bool color,
+  const int64_t* copies,
+  const bool* landscape,
+  const bool* color,
   const DuplexMode* duplex_mode)
  : printer_address_(printer_address ? std::optional<std::string>(*printer_address) : std::nullopt),
     page_size_(page_size ? std::make_unique<PageSize>(*page_size) : nullptr),
     margins_(margins ? std::make_unique<PageMargins>(*margins) : nullptr),
-    copies_(copies),
-    landscape_(landscape),
-    color_(color),
+    copies_(copies ? std::optional<int64_t>(*copies) : std::nullopt),
+    landscape_(landscape ? std::optional<bool>(*landscape) : std::nullopt),
+    color_(color ? std::optional<bool>(*color) : std::nullopt),
     duplex_mode_(duplex_mode ? std::optional<DuplexMode>(*duplex_mode) : std::nullopt) {}
 
 PrintOptions::PrintOptions(const PrintOptions& other)
  : printer_address_(other.printer_address_ ? std::optional<std::string>(*other.printer_address_) : std::nullopt),
     page_size_(other.page_size_ ? std::make_unique<PageSize>(*other.page_size_) : nullptr),
     margins_(other.margins_ ? std::make_unique<PageMargins>(*other.margins_) : nullptr),
-    copies_(other.copies_),
-    landscape_(other.landscape_),
-    color_(other.color_),
+    copies_(other.copies_ ? std::optional<int64_t>(*other.copies_) : std::nullopt),
+    landscape_(other.landscape_ ? std::optional<bool>(*other.landscape_) : std::nullopt),
+    color_(other.color_ ? std::optional<bool>(*other.color_) : std::nullopt),
     duplex_mode_(other.duplex_mode_ ? std::optional<DuplexMode>(*other.duplex_mode_) : std::nullopt) {}
 
 PrintOptions& PrintOptions::operator=(const PrintOptions& other) {
@@ -623,8 +617,12 @@ void PrintOptions::set_margins(const PageMargins& value_arg) {
 }
 
 
-int64_t PrintOptions::copies() const {
-  return copies_;
+const int64_t* PrintOptions::copies() const {
+  return copies_ ? &(*copies_) : nullptr;
+}
+
+void PrintOptions::set_copies(const int64_t* value_arg) {
+  copies_ = value_arg ? std::optional<int64_t>(*value_arg) : std::nullopt;
 }
 
 void PrintOptions::set_copies(int64_t value_arg) {
@@ -632,8 +630,12 @@ void PrintOptions::set_copies(int64_t value_arg) {
 }
 
 
-bool PrintOptions::landscape() const {
-  return landscape_;
+const bool* PrintOptions::landscape() const {
+  return landscape_ ? &(*landscape_) : nullptr;
+}
+
+void PrintOptions::set_landscape(const bool* value_arg) {
+  landscape_ = value_arg ? std::optional<bool>(*value_arg) : std::nullopt;
 }
 
 void PrintOptions::set_landscape(bool value_arg) {
@@ -641,8 +643,12 @@ void PrintOptions::set_landscape(bool value_arg) {
 }
 
 
-bool PrintOptions::color() const {
-  return color_;
+const bool* PrintOptions::color() const {
+  return color_ ? &(*color_) : nullptr;
+}
+
+void PrintOptions::set_color(const bool* value_arg) {
+  color_ = value_arg ? std::optional<bool>(*value_arg) : std::nullopt;
 }
 
 void PrintOptions::set_color(bool value_arg) {
@@ -669,18 +675,15 @@ EncodableList PrintOptions::ToEncodableList() const {
   list.push_back(printer_address_ ? EncodableValue(*printer_address_) : EncodableValue());
   list.push_back(page_size_ ? CustomEncodableValue(*page_size_) : EncodableValue());
   list.push_back(margins_ ? CustomEncodableValue(*margins_) : EncodableValue());
-  list.push_back(EncodableValue(copies_));
-  list.push_back(EncodableValue(landscape_));
-  list.push_back(EncodableValue(color_));
+  list.push_back(copies_ ? EncodableValue(*copies_) : EncodableValue());
+  list.push_back(landscape_ ? EncodableValue(*landscape_) : EncodableValue());
+  list.push_back(color_ ? EncodableValue(*color_) : EncodableValue());
   list.push_back(duplex_mode_ ? CustomEncodableValue(*duplex_mode_) : EncodableValue());
   return list;
 }
 
 PrintOptions PrintOptions::FromEncodableList(const EncodableList& list) {
-  PrintOptions decoded(
-    std::get<int64_t>(list[3]),
-    std::get<bool>(list[4]),
-    std::get<bool>(list[5]));
+  PrintOptions decoded;
   auto& encodable_printer_address = list[0];
   if (!encodable_printer_address.IsNull()) {
     decoded.set_printer_address(std::get<std::string>(encodable_printer_address));
@@ -692,6 +695,18 @@ PrintOptions PrintOptions::FromEncodableList(const EncodableList& list) {
   auto& encodable_margins = list[2];
   if (!encodable_margins.IsNull()) {
     decoded.set_margins(std::any_cast<const PageMargins&>(std::get<CustomEncodableValue>(encodable_margins)));
+  }
+  auto& encodable_copies = list[3];
+  if (!encodable_copies.IsNull()) {
+    decoded.set_copies(std::get<int64_t>(encodable_copies));
+  }
+  auto& encodable_landscape = list[4];
+  if (!encodable_landscape.IsNull()) {
+    decoded.set_landscape(std::get<bool>(encodable_landscape));
+  }
+  auto& encodable_color = list[5];
+  if (!encodable_color.IsNull()) {
+    decoded.set_color(std::get<bool>(encodable_color));
   }
   auto& encodable_duplex_mode = list[6];
   if (!encodable_duplex_mode.IsNull()) {
@@ -746,11 +761,26 @@ std::ostream& operator<<(
     os << "null";
   }
   os << ", copies: ";
-  os << PigeonInternalToString(obj.copies_);
+  if (obj.copies_) {
+    os << PigeonInternalToString(*obj.copies_);
+  }
+  else {
+    os << "null";
+  }
   os << ", landscape: ";
-  os << PigeonInternalToString(obj.landscape_);
+  if (obj.landscape_) {
+    os << PigeonInternalToString(*obj.landscape_);
+  }
+  else {
+    os << "null";
+  }
   os << ", color: ";
-  os << PigeonInternalToString(obj.color_);
+  if (obj.color_) {
+    os << PigeonInternalToString(*obj.color_);
+  }
+  else {
+    os << "null";
+  }
   os << ", duplex_mode: ";
   if (obj.duplex_mode_) {
     os << PigeonInternalToString(*obj.duplex_mode_);

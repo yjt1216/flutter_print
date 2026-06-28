@@ -348,12 +348,17 @@ struct PrintOptions: Hashable, CustomStringConvertible {
   var margins: PageMargins? = nil
   /// Number of copies to print. Must be ≥ 1.
   ///
+  /// When `null` the platform/printer default is used.
   /// Ignored on iOS (controlled by the system dialog).
-  var copies: Int64
+  var copies: Int64? = nil
   /// Whether to print in landscape orientation.
-  var landscape: Bool
+  ///
+  /// When `null` the platform/printer default orientation is used.
+  var landscape: Bool? = nil
   /// Whether to print in colour. Set to `false` for greyscale/monochrome.
-  var color: Bool
+  ///
+  /// When `null` the platform/printer default colour mode is used.
+  var color: Bool? = nil
   /// Duplex (double-sided) printing mode.
   ///
   /// When `null` the platform default is used (typically single-sided).
@@ -367,9 +372,9 @@ struct PrintOptions: Hashable, CustomStringConvertible {
     let printerAddress: String? = nilOrValue(pigeonVar_list[0])
     let pageSize: PageSize? = nilOrValue(pigeonVar_list[1])
     let margins: PageMargins? = nilOrValue(pigeonVar_list[2])
-    let copies = pigeonVar_list[3] as! Int64
-    let landscape = pigeonVar_list[4] as! Bool
-    let color = pigeonVar_list[5] as! Bool
+    let copies: Int64? = nilOrValue(pigeonVar_list[3])
+    let landscape: Bool? = nilOrValue(pigeonVar_list[4])
+    let color: Bool? = nilOrValue(pigeonVar_list[5])
     let duplexMode: DuplexMode? = nilOrValue(pigeonVar_list[6])
 
     return PrintOptions(

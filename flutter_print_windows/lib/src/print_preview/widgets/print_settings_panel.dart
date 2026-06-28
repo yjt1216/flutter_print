@@ -49,12 +49,12 @@ class _PrintSettingsPanelState extends State<PrintSettingsPanel> {
     final caps = _caps;
     if (caps == null) return;
 
-    int copies = _options.copies;
+    int copies = _options.copies ?? 1;
     if (caps.maxCopies != null && copies > caps.maxCopies!) {
       copies = caps.maxCopies!;
     }
 
-    bool color = _options.color;
+    bool color = _options.color ?? true;
     switch (caps.colorCapability) {
       case ColorCapability.enforced:
         color = true;
@@ -92,7 +92,14 @@ class _PrintSettingsPanelState extends State<PrintSettingsPanel> {
       _customPageSize = ps;
     }
 
-    _options = opts.copyWith(pageSize: _resolvePageSize(ps?.name ?? 'A4'));
+    // Normalise unset fields to concrete display defaults so the dialog UI and
+    // preview stay consistent; the user's choices are then sent explicitly.
+    _options = opts.copyWith(
+      copies: opts.copies ?? 1,
+      landscape: opts.landscape ?? false,
+      color: opts.color ?? true,
+      pageSize: _resolvePageSize(ps?.name ?? 'A4'),
+    );
   }
 
   void _emit(PrintOptions opts) {
@@ -130,7 +137,7 @@ class _PrintSettingsPanelState extends State<PrintSettingsPanel> {
             const SizedBox(height: 14),
             _SectionLabel(l10n.copies),
             _CopiesSelector(
-              value: _options.copies,
+              value: _options.copies ?? 1,
               max: _caps?.maxCopies,
               onChanged: (v) => _emit(_options.copyWith(copies: v)),
             ),
@@ -138,7 +145,7 @@ class _PrintSettingsPanelState extends State<PrintSettingsPanel> {
           const SizedBox(height: 14),
           _SectionLabel(l10n.layout),
           _LayoutSelector(
-            value: _options.landscape,
+            value: _options.landscape ?? false,
             onChanged: (v) => _emit(_options.copyWith(landscape: v)),
           ),
           if (_caps?.colorCapability != ColorCapability.monochrome &&
@@ -146,7 +153,7 @@ class _PrintSettingsPanelState extends State<PrintSettingsPanel> {
             const SizedBox(height: 14),
             _SectionLabel(l10n.color),
             _ColorSelector(
-              value: _options.color,
+              value: _options.color ?? true,
               onChanged: (v) => _emit(_options.copyWith(color: v)),
             ),
           ],

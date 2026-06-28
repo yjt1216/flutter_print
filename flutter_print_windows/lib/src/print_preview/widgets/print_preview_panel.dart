@@ -74,7 +74,7 @@ class _PrintPreviewPanelState extends State<PrintPreviewPanel> {
     final pageSize = widget.options.pageSize;
     final w = pageSize?.width ?? 210.0;
     final h = pageSize?.height ?? 297.0;
-    final landscape = widget.options.landscape;
+    final landscape = widget.options.landscape ?? false;
     final margins = await WindowsPrintChannel.getMinimumMargins(
       printerName: printer,
       paperSizeName: pageSize?.name,
@@ -89,7 +89,7 @@ class _PrintPreviewPanelState extends State<PrintPreviewPanel> {
     final mime = _mimeType;
     final double w = widget.options.pageSize?.width ?? 210.0;
     final double h = widget.options.pageSize?.height ?? 297.0;
-    final bool landscape = widget.options.landscape;
+    final bool landscape = widget.options.landscape ?? false;
     final double paperW = landscape ? h : w;
     final double paperH = landscape ? w : h;
     final double paperAspect = paperW / paperH;
@@ -115,7 +115,7 @@ class _PrintPreviewPanelState extends State<PrintPreviewPanel> {
         paperWidthMm: paperW,
         paperHeightMm: paperH,
         minimumMargins: _minimumMargins,
-        color: widget.options.color,
+        color: widget.options.color ?? true,
       );
     }
 
@@ -126,7 +126,7 @@ class _PrintPreviewPanelState extends State<PrintPreviewPanel> {
         paperWidthMm: paperW,
         paperHeightMm: paperH,
         minimumMargins: _minimumMargins,
-        color: widget.options.color,
+        color: widget.options.color ?? true,
       );
     }
 

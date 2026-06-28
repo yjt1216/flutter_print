@@ -87,8 +87,14 @@ private extension FlutterPrintPlugin {
 
     let printInfo = UIPrintInfo(dictionary: nil)
     printInfo.jobName = fileURL.lastPathComponent
-    printInfo.outputType = (options?.color ?? true) ? .general : .grayscale
-    printInfo.orientation = (options?.landscape == true) ? .landscape : .portrait
+    // Each option is applied only when provided; unset fields keep UIPrintInfo's
+    // system defaults.
+    if let color = options?.color {
+      printInfo.outputType = color ? .general : .grayscale
+    }
+    if let landscape = options?.landscape {
+      printInfo.orientation = landscape ? .landscape : .portrait
+    }
     if let duplex = options?.duplexMode {
       switch duplex {
       case .none:      printInfo.duplex = .none
