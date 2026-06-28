@@ -265,6 +265,7 @@ abstract class FlutterPrintApi {
   ///
   /// Throws a [PlatformException] if the file is not found, the file type is
   /// unsupported, or the print subsystem reports an error.
+  @async
   void print(String filePath, {PrintOptions? options});
 
   /// Opens the native print-preview or print dialog for [filePath].
@@ -282,6 +283,7 @@ abstract class FlutterPrintApi {
   /// printing to the default document viewer.
   ///
   /// Throws a [PlatformException] if the file is not found.
+  @async
   void printPreview(String filePath, {PrintOptions? options});
 
   /// Returns all printers currently available on this device.

@@ -76,14 +76,26 @@ public class FlutterPrintPlugin
   // -------------------------------------------------------------------------
 
   @Override
-  public void print(@NonNull String filePath, @NonNull Messages.PrintOptions options) {
-    handlePrint(filePath, options);
+  public void print(@NonNull String filePath, @Nullable Messages.PrintOptions options,
+                    @NonNull Messages.VoidResult result) {
+    try {
+      handlePrint(filePath, options);
+      result.success();
+    } catch (Throwable e) {
+      result.error(e);
+    }
   }
 
   @Override
-  public void printPreview(@NonNull String filePath, @NonNull Messages.PrintOptions options) {
+  public void printPreview(@NonNull String filePath, @Nullable Messages.PrintOptions options,
+                           @NonNull Messages.VoidResult result) {
     // Android's PrintManager always shows a dialog with a preview.
-    handlePrint(filePath, options);
+    try {
+      handlePrint(filePath, options);
+      result.success();
+    } catch (Throwable e) {
+      result.error(e);
+    }
   }
 
   @Override

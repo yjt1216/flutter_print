@@ -27,10 +27,10 @@ class FlutterPrintPlugin : public flutter::Plugin, public FlutterPrintApi {
   FlutterPrintPlugin& operator=(const FlutterPrintPlugin&) = delete;
 
   // FlutterPrintApi
-  std::optional<FlutterError> Print(const std::string& file_path,
-                                     const PrintOptions* options) override;
-  std::optional<FlutterError> PrintPreview(const std::string& file_path,
-                                            const PrintOptions* options) override;
+  void Print(const std::string& file_path, const PrintOptions* options,
+             std::function<void(std::optional<FlutterError> reply)> result) override;
+  void PrintPreview(const std::string& file_path, const PrintOptions* options,
+                    std::function<void(std::optional<FlutterError> reply)> result) override;
   void PickPrinter(
       std::function<void(ErrorOr<std::optional<PrinterInfo>>)> result) override;
   void ListPrinters(
@@ -42,6 +42,11 @@ class FlutterPrintPlugin : public flutter::Plugin, public FlutterPrintApi {
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
  private:
+  // Synchronous core of Print(); the public override forwards its result to the
+  // Pigeon completion callback.
+  std::optional<FlutterError> PrintInternal(const std::string& file_path,
+                                            const PrintOptions* options);
+
   using WinResult =
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>;
 

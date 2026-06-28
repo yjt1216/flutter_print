@@ -620,60 +620,14 @@ G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApi, flutter_print_flutter_print_ap
 
 G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiResponseHandle, flutter_print_flutter_print_api_response_handle, FLUTTER_PRINT, FLUTTER_PRINT_API_RESPONSE_HANDLE, GObject)
 
-G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiPrintResponse, flutter_print_flutter_print_api_print_response, FLUTTER_PRINT, FLUTTER_PRINT_API_PRINT_RESPONSE, GObject)
-
-/**
- * flutter_print_flutter_print_api_print_response_new:
- *
- * Creates a new response to FlutterPrintApi.print.
- *
- * Returns: a new #FlutterPrintFlutterPrintApiPrintResponse
- */
-FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new();
-
-/**
- * flutter_print_flutter_print_api_print_response_new_error:
- * @code: error code.
- * @message: error message.
- * @details: (allow-none): error details or %NULL.
- *
- * Creates a new error response to FlutterPrintApi.print.
- *
- * Returns: a new #FlutterPrintFlutterPrintApiPrintResponse
- */
-FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new_error(const gchar* code, const gchar* message, FlValue* details);
-
-G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiPrintPreviewResponse, flutter_print_flutter_print_api_print_preview_response, FLUTTER_PRINT, FLUTTER_PRINT_API_PRINT_PREVIEW_RESPONSE, GObject)
-
-/**
- * flutter_print_flutter_print_api_print_preview_response_new:
- *
- * Creates a new response to FlutterPrintApi.printPreview.
- *
- * Returns: a new #FlutterPrintFlutterPrintApiPrintPreviewResponse
- */
-FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new();
-
-/**
- * flutter_print_flutter_print_api_print_preview_response_new_error:
- * @code: error code.
- * @message: error message.
- * @details: (allow-none): error details or %NULL.
- *
- * Creates a new error response to FlutterPrintApi.printPreview.
- *
- * Returns: a new #FlutterPrintFlutterPrintApiPrintPreviewResponse
- */
-FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new_error(const gchar* code, const gchar* message, FlValue* details);
-
 /**
  * FlutterPrintFlutterPrintApiVTable:
  *
  * Table of functions exposed by FlutterPrintApi to be implemented by the API provider.
  */
 typedef struct {
-  FlutterPrintFlutterPrintApiPrintResponse* (*print)(const gchar* file_path, FlutterPrintPrintOptions* options, gpointer user_data);
-  FlutterPrintFlutterPrintApiPrintPreviewResponse* (*print_preview)(const gchar* file_path, FlutterPrintPrintOptions* options, gpointer user_data);
+  void (*print)(const gchar* file_path, FlutterPrintPrintOptions* options, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
+  void (*print_preview)(const gchar* file_path, FlutterPrintPrintOptions* options, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*list_printers)(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*pick_printer)(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
 } FlutterPrintFlutterPrintApiVTable;
@@ -700,6 +654,44 @@ void flutter_print_flutter_print_api_set_method_handlers(FlBinaryMessenger* mess
  * Clears the method handlers in the FlutterPrintApi API.
  */
 void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix);
+
+/**
+ * flutter_print_flutter_print_api_respond_print:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ *
+ * Responds to FlutterPrintApi.print. 
+ */
+void flutter_print_flutter_print_api_respond_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle);
+
+/**
+ * flutter_print_flutter_print_api_respond_error_print:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to FlutterPrintApi.print. 
+ */
+void flutter_print_flutter_print_api_respond_error_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * flutter_print_flutter_print_api_respond_print_preview:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ *
+ * Responds to FlutterPrintApi.printPreview. 
+ */
+void flutter_print_flutter_print_api_respond_print_preview(FlutterPrintFlutterPrintApiResponseHandle* response_handle);
+
+/**
+ * flutter_print_flutter_print_api_respond_error_print_preview:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to FlutterPrintApi.printPreview. 
+ */
+void flutter_print_flutter_print_api_respond_error_print_preview(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
 
 /**
  * flutter_print_flutter_print_api_respond_list_printers:

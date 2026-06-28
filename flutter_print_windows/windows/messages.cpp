@@ -1209,14 +1209,15 @@ void FlutterPrintApi::SetUp(
           const auto& file_path_arg = std::get<std::string>(encodable_file_path_arg);
           const auto& encodable_options_arg = args.at(1);
           const auto* options_arg = encodable_options_arg.IsNull() ? nullptr : &(std::any_cast<const PrintOptions&>(std::get<CustomEncodableValue>(encodable_options_arg)));
-          std::optional<FlutterError> output = api->Print(file_path_arg, options_arg);
-          if (output.has_value()) {
-            reply(WrapError(output.value()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(EncodableValue());
-          reply(EncodableValue(std::move(wrapped)));
+          api->Print(file_path_arg, options_arg, [reply](std::optional<FlutterError>&& output) {
+            if (output.has_value()) {
+              reply(WrapError(output.value()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue());
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -1239,14 +1240,15 @@ void FlutterPrintApi::SetUp(
           const auto& file_path_arg = std::get<std::string>(encodable_file_path_arg);
           const auto& encodable_options_arg = args.at(1);
           const auto* options_arg = encodable_options_arg.IsNull() ? nullptr : &(std::any_cast<const PrintOptions&>(std::get<CustomEncodableValue>(encodable_options_arg)));
-          std::optional<FlutterError> output = api->PrintPreview(file_path_arg, options_arg);
-          if (output.has_value()) {
-            reply(WrapError(output.value()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(EncodableValue());
-          reply(EncodableValue(std::move(wrapped)));
+          api->PrintPreview(file_path_arg, options_arg, [reply](std::optional<FlutterError>&& output) {
+            if (output.has_value()) {
+              reply(WrapError(output.value()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue());
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }

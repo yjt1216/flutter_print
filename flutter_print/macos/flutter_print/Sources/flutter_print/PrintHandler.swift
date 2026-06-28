@@ -2,20 +2,33 @@ import Cocoa
 import FlutterMacOS
 import PDFKit
 
+/// Boxes a Pigeon completion so it can be passed through the Objective-C
+/// `contextInfo` pointer of `NSPrintOperation.runModal(for:delegate:didRun:contextInfo:)`.
+private final class PrintCompletionBox {
+  let completion: (Result<Void, Error>) -> Void
+  init(_ completion: @escaping (Result<Void, Error>) -> Void) {
+    self.completion = completion
+  }
+}
+
 extension FlutterPrintPlugin {
-  func print(filePath: String, options: PrintOptions?) throws {
-    try handlePrint(filePath: filePath, options: options, showPanel: false)
+  func print(filePath: String, options: PrintOptions?,
+             completion: @escaping (Result<Void, Error>) -> Void) {
+    handlePrint(filePath: filePath, options: options, showPanel: false, completion: completion)
   }
 
-  func printPreview(filePath: String, options: PrintOptions?) throws {
-    try handlePrint(filePath: filePath, options: options, showPanel: true)
+  func printPreview(filePath: String, options: PrintOptions?,
+                    completion: @escaping (Result<Void, Error>) -> Void) {
+    handlePrint(filePath: filePath, options: options, showPanel: true, completion: completion)
   }
 
-  private func handlePrint(filePath: String, options: PrintOptions?, showPanel: Bool) throws {
+  private func handlePrint(filePath: String, options: PrintOptions?, showPanel: Bool,
+                           completion: @escaping (Result<Void, Error>) -> Void) {
     guard FileManager.default.fileExists(atPath: filePath) else {
-      throw PigeonError(code: "FILE_NOT_FOUND",
-                        message: "File not found: \(filePath)",
-                        details: nil)
+      completion(.failure(PigeonError(code: "FILE_NOT_FOUND",
+                                      message: "File not found: \(filePath)",
+                                      details: nil)))
+      return
     }
 
     let fileURL = URL(fileURLWithPath: filePath)
@@ -23,32 +36,68 @@ extension FlutterPrintPlugin {
 
     if ext == "pdf" {
       guard let doc = PDFDocument(url: fileURL) else {
-        throw PigeonError(code: "INVALID_FILE", message: "Cannot open PDF", details: nil)
+        completion(.failure(PigeonError(code: "INVALID_FILE",
+                                        message: "Cannot open PDF", details: nil)))
+        return
       }
-      try printRendered(url: fileURL, options: options, showPanel: showPanel) { info in
-        let l = self.layout(for: info)
-        return PDFPagePrintView(document: doc, paperSize: l.paper, contentRect: l.content)
+      printRendered(url: fileURL, options: options, showPanel: showPanel,
+                    completion: completion) { info in
+        let ps = info.paperSize
+        let paperSize: NSSize = info.orientation == .landscape
+          ? NSSize(width: max(ps.width, ps.height), height: min(ps.width, ps.height))
+          : NSSize(width: min(ps.width, ps.height), height: max(ps.width, ps.height))
+        return PDFPagePrintView(document: doc, paperSize: paperSize)
       }
     } else if let image = NSImage(contentsOf: fileURL) {
-      try printRendered(url: fileURL, options: options, showPanel: showPanel) { info in
-        let l = self.layout(for: info)
-        return ImagePrintView(
-          image: image,
-          bounds: NSRect(origin: .zero, size: l.paper),
-          contentRect: l.content)
+      printRendered(url: fileURL, options: options, showPanel: showPanel,
+                    completion: completion) { info in
+        ImagePrintView(image: image, bounds: info.imageablePageBounds)
       }
     } else if showPanel {
-      DispatchQueue.main.async { NSWorkspace.shared.open(fileURL) }
+      openInDefaultApp(fileURL, errorCode: "PREVIEW_ERROR", completion: completion)
     } else {
       // No native renderer for this file type. Try a silent CUPS job via lp;
       // if that's blocked (e.g. the app is sandboxed, which forbids spawning
       // /usr/bin/lp), fall back to handing the file to its default app.
-      do {
-        try printViaLp(url: fileURL, options: options)
-      } catch {
-        DispatchQueue.main.async { NSWorkspace.shared.open(fileURL) }
+      printViaLp(url: fileURL, options: options) { result in
+        switch result {
+        case .launchFailed:
+          self.openInDefaultApp(fileURL, errorCode: "PRINT_ERROR", completion: completion)
+        case .completed(let status) where status == 0:
+          completion(.success(()))
+        case .completed(let status):
+          completion(.failure(PigeonError(code: "PRINT_ERROR",
+                                          message: "lp exited with status \(status)",
+                                          details: nil)))
+        }
       }
     }
+  }
+
+  /// Hands [fileURL] to its default application, reporting whether the open
+  /// succeeded. Runs on the main thread as required by NSWorkspace.
+  private func openInDefaultApp(_ fileURL: URL, errorCode: String,
+                                completion: @escaping (Result<Void, Error>) -> Void) {
+    DispatchQueue.main.async {
+      if NSWorkspace.shared.open(fileURL) {
+        completion(.success(()))
+      } else {
+        completion(.failure(PigeonError(code: errorCode,
+                                        message: "Cannot open file: \(fileURL.path)",
+                                        details: nil)))
+      }
+    }
+  }
+
+  /// Called by `runModal(for:delegate:didRun:contextInfo:)` when the print sheet
+  /// is dismissed. Cancellation (`success == false`) is treated as success, to
+  /// match the iOS dialog behaviour where cancelling is a normal outcome.
+  @objc func printOperationDidRun(_ printOperation: NSPrintOperation,
+                                  success: Bool,
+                                  contextInfo: UnsafeMutableRawPointer?) {
+    guard let contextInfo else { return }
+    let box = Unmanaged<PrintCompletionBox>.fromOpaque(contextInfo).takeRetainedValue()
+    box.completion(.success(()))
   }
 
   private func buildPrintInfo(options: PrintOptions?) -> NSPrintInfo {
@@ -129,10 +178,17 @@ extension FlutterPrintPlugin {
     url: URL,
     options: PrintOptions?,
     showPanel: Bool,
+    completion: @escaping (Result<Void, Error>) -> Void,
     makeView: (NSPrintInfo) throws -> NSView
-  ) throws {
+  ) {
     let printInfo = buildPrintInfo(options: options)
-    let view = try makeView(printInfo)
+    let view: NSView
+    do {
+      view = try makeView(printInfo)
+    } catch {
+      completion(.failure(error))
+      return
+    }
     DispatchQueue.main.async {
       let op = NSPrintOperation(view: view, printInfo: printInfo)
       op.showsPrintPanel = showPanel
@@ -154,14 +210,35 @@ extension FlutterPrintPlugin {
       // printing" when called outside a user-event context.
       let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible })
       if showPanel, let window {
-        op.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        // The sheet is asynchronous; resolve the completion from the didRun
+        // callback, passing it through contextInfo as a retained box.
+        let context = Unmanaged.passRetained(PrintCompletionBox(completion)).toOpaque()
+        op.runModal(for: window, delegate: self,
+                    didRun: #selector(self.printOperationDidRun(_:success:contextInfo:)),
+                    contextInfo: context)
       } else {
-        op.run()
+        // run() is synchronous and returns whether the job succeeded.
+        if op.run() {
+          completion(.success(()))
+        } else {
+          completion(.failure(PigeonError(code: "PRINT_ERROR",
+                                          message: "Print operation failed",
+                                          details: nil)))
+        }
       }
     }
   }
 
-  private func printViaLp(url: URL, options: PrintOptions?) throws {
+  /// Outcome of attempting a silent `lp` print job.
+  private enum LpResult {
+    /// `lp` could not be spawned at all (e.g. the app is sandboxed).
+    case launchFailed
+    /// `lp` ran to completion with the given exit status (0 == success).
+    case completed(Int32)
+  }
+
+  private func printViaLp(url: URL, options: PrintOptions?,
+                          completion: @escaping (LpResult) -> Void) {
     var args: [String] = []
     if let addr = options?.printerAddress, !addr.isEmpty {
       args += ["-d", addr]
@@ -204,7 +281,19 @@ extension FlutterPrintPlugin {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/lp")
     process.arguments = args
-    try process.run()
+
+    // Run lp off the platform thread and wait for it, so the actual print
+    // outcome (not merely whether the process spawned) is reported back.
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try process.run()
+      } catch {
+        completion(.launchFailed)
+        return
+      }
+      process.waitUntilExit()
+      completion(.completed(process.terminationStatus))
+    }
   }
 
   @discardableResult

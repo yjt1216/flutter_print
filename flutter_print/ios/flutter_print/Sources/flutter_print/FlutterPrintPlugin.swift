@@ -11,12 +11,14 @@ public class FlutterPrintPlugin: NSObject, FlutterPlugin {
 // MARK: - FlutterPrintApi
 
 extension FlutterPrintPlugin: FlutterPrintApi {
-  func print(filePath: String, options: PrintOptions?) throws {
-    try handlePrint(filePath: filePath, options: options, showPreview: false)
+  func print(filePath: String, options: PrintOptions?,
+             completion: @escaping (Result<Void, Error>) -> Void) {
+    handlePrint(filePath: filePath, options: options, showPreview: false, completion: completion)
   }
 
-  func printPreview(filePath: String, options: PrintOptions?) throws {
-    try handlePrint(filePath: filePath, options: options, showPreview: true)
+  func printPreview(filePath: String, options: PrintOptions?,
+                    completion: @escaping (Result<Void, Error>) -> Void) {
+    handlePrint(filePath: filePath, options: options, showPreview: true, completion: completion)
   }
 
   func listPrinters(completion: @escaping (Result<[PrinterInfo], any Error>) -> Void) {
@@ -33,7 +35,8 @@ extension FlutterPrintPlugin: FlutterPrintApi {
 
       let picker = UIPrinterPickerController(initiallySelectedPrinter: nil)
 
-      let handler: UIPrinterPickerController.CompletionHandler = { controller, userDidSelect, _ in
+      let handler: UIPrinterPickerController.CompletionHandler = { [picker] controller, userDidSelect, _ in
+        _ = picker
         guard userDidSelect, let printer = controller.selectedPrinter else {
           completion(.success(nil))
           return
@@ -64,19 +67,22 @@ extension FlutterPrintPlugin: FlutterPrintApi {
 // MARK: - Private
 
 private extension FlutterPrintPlugin {
-  func handlePrint(filePath: String, options: PrintOptions?, showPreview: Bool) throws {
+  func handlePrint(filePath: String, options: PrintOptions?, showPreview: Bool,
+                   completion: @escaping (Result<Void, Error>) -> Void) {
     let fileURL = URL(fileURLWithPath: filePath)
 
     guard FileManager.default.fileExists(atPath: filePath) else {
-      throw PigeonError(code: "FILE_NOT_FOUND",
-                        message: "File not found: \(filePath)",
-                        details: nil)
+      completion(.failure(PigeonError(code: "FILE_NOT_FOUND",
+                                      message: "File not found: \(filePath)",
+                                      details: nil)))
+      return
     }
 
     guard UIPrintInteractionController.canPrint(fileURL) else {
-      throw PigeonError(code: "UNSUPPORTED_FILE",
-                        message: "File type not supported for printing",
-                        details: nil)
+      completion(.failure(PigeonError(code: "UNSUPPORTED_FILE",
+                                      message: "File type not supported for printing",
+                                      details: nil)))
+      return
     }
 
     let printInfo = UIPrintInfo(dictionary: nil)
@@ -91,28 +97,57 @@ private extension FlutterPrintPlugin {
       }
     }
 
-    let controller = UIPrintInteractionController.shared
-    controller.printInfo = printInfo
-    controller.printingItem = fileURL
-
     DispatchQueue.main.async {
-      guard let rootVC = self.rootViewController() else { return }
+      let controller = UIPrintInteractionController.shared
+      controller.printInfo = printInfo
+      controller.printingItem = fileURL
+
+      // Bridges the UIKit completion handler to the Pigeon completion. A
+      // user-cancelled dialog (completed == false) is reported as success,
+      // since cancellation is a normal outcome rather than a failure.
+      let printHandler: UIPrintInteractionController.CompletionHandler = { _, _, error in
+        if let error = error {
+          completion(.failure(PigeonError(code: "PRINT_ERROR",
+                                          message: error.localizedDescription,
+                                          details: nil)))
+        } else {
+          completion(.success(()))
+        }
+      }
 
       // If a printer URL string is provided, print directly without UI.
+      // This path does not need a view controller.
       if !showPreview,
          let urlString = options?.printerAddress,
          let printerURL = URL(string: urlString)
       {
         let printer = UIPrinter(url: printerURL)
-        controller.print(to: printer, completionHandler: nil)
+        if !controller.print(to: printer, completionHandler: printHandler) {
+          completion(.failure(PigeonError(code: "PRINT_ERROR",
+                                          message: "Failed to start the print job",
+                                          details: nil)))
+        }
         return
       }
 
+      guard let rootVC = self.rootViewController() else {
+        completion(.failure(PigeonError(code: "NO_WINDOW",
+                                        message: "No active window to present the print dialog",
+                                        details: nil)))
+        return
+      }
+
+      let presented: Bool
       if UIDevice.current.userInterfaceIdiom == .pad {
-        controller.present(from: rootVC.view.bounds, in: rootVC.view,
-                           animated: true, completionHandler: nil)
+        presented = controller.present(from: rootVC.view.bounds, in: rootVC.view,
+                                       animated: true, completionHandler: printHandler)
       } else {
-        controller.present(animated: true, completionHandler: nil)
+        presented = controller.present(animated: true, completionHandler: printHandler)
+      }
+      if !presented {
+        completion(.failure(PigeonError(code: "PRINT_ERROR",
+                                        message: "Failed to present the print dialog",
+                                        details: nil)))
       }
     }
   }

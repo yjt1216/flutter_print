@@ -663,7 +663,7 @@ protocol FlutterPrintApi {
   ///
   /// Throws a [PlatformException] if the file is not found, the file type is
   /// unsupported, or the print subsystem reports an error.
-  func print(filePath: String, options: PrintOptions?) throws
+  func print(filePath: String, options: PrintOptions?, completion: @escaping (Result<Void, Error>) -> Void)
   /// Opens the native print-preview or print dialog for [filePath].
   ///
   /// **Android / iOS** — identical to [print]: the system print dialog always
@@ -679,7 +679,7 @@ protocol FlutterPrintApi {
   /// printing to the default document viewer.
   ///
   /// Throws a [PlatformException] if the file is not found.
-  func printPreview(filePath: String, options: PrintOptions?) throws
+  func printPreview(filePath: String, options: PrintOptions?, completion: @escaping (Result<Void, Error>) -> Void)
   /// Returns all printers currently available on this device.
   ///
   /// **Android / iOS / Web** — always returns an empty list.
@@ -728,11 +728,13 @@ class FlutterPrintApiSetup {
         let args = message as! [Any?]
         let filePathArg = args[0] as! String
         let optionsArg: PrintOptions? = nilOrValue(args[1])
-        do {
-          try api.print(filePath: filePathArg, options: optionsArg)
-          reply(wrapResult(nil))
-        } catch {
-          reply(wrapError(error))
+        api.print(filePath: filePathArg, options: optionsArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -759,11 +761,13 @@ class FlutterPrintApiSetup {
         let args = message as! [Any?]
         let filePathArg = args[0] as! String
         let optionsArg: PrintOptions? = nilOrValue(args[1])
-        do {
-          try api.printPreview(filePath: filePathArg, options: optionsArg)
-          reply(wrapResult(nil))
-        } catch {
-          reply(wrapError(error))
+        api.printPreview(filePath: filePathArg, options: optionsArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {

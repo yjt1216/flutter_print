@@ -81,16 +81,17 @@ static gchar* transcode_to_png(const char* path) {
 // Print / PrintPreview
 // ---------------------------------------------------------------------------
 
-static FlutterPrintFlutterPrintApiPrintResponse* handle_print(
+static void handle_print(
     const gchar* file_path,
     FlutterPrintPrintOptions* options,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
     gpointer user_data) {
 
   if (!g_file_test(file_path, G_FILE_TEST_EXISTS)) {
-    return flutter_print_flutter_print_api_print_response_new_error(
-        "FILE_NOT_FOUND",
-        g_strdup_printf("File not found: %s", file_path),
-        nullptr);
+    g_autofree gchar* msg = g_strdup_printf("File not found: %s", file_path);
+    flutter_print_flutter_print_api_respond_error_print(
+        response_handle, "FILE_NOT_FOUND", msg, nullptr);
+    return;
   }
 
 #ifdef HAS_CUPS
@@ -175,8 +176,9 @@ static FlutterPrintFlutterPrintApiPrintResponse* handle_print(
   }
 
   if (job_id == 0) {
-    return flutter_print_flutter_print_api_print_response_new_error(
-        "PRINT_ERROR", cupsLastErrorString(), nullptr);
+    flutter_print_flutter_print_api_respond_error_print(
+        response_handle, "PRINT_ERROR", cupsLastErrorString(), nullptr);
+    return;
   }
 
 #else
@@ -243,25 +245,32 @@ static FlutterPrintFlutterPrintApiPrintResponse* handle_print(
   g_clear_error(&err);
 
   if (!ok || exit_status != 0) {
-    return flutter_print_flutter_print_api_print_response_new_error(
-        "PRINT_ERROR", "lp command failed", nullptr);
+    flutter_print_flutter_print_api_respond_error_print(
+        response_handle, "PRINT_ERROR", "lp command failed", nullptr);
+    return;
   }
 #endif
 
-  return flutter_print_flutter_print_api_print_response_new();
+  flutter_print_flutter_print_api_respond_print(response_handle);
 }
 
-static FlutterPrintFlutterPrintApiPrintPreviewResponse* handle_print_preview(
+static void handle_print_preview(
     const gchar* file_path,
     FlutterPrintPrintOptions* options,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
     gpointer user_data) {
   g_autoptr(GError) err = nullptr;
   g_autoptr(GSubprocess) proc =
       g_subprocess_new(G_SUBPROCESS_FLAGS_NONE, &err, "xdg-open", file_path, nullptr);
   if (!proc) {
-    g_warning("xdg-open failed: %s", err ? err->message : "(unknown)");
+    g_autofree gchar* msg =
+        g_strdup_printf("xdg-open failed: %s", err ? err->message : "(unknown)");
+    g_warning("%s", msg);
+    flutter_print_flutter_print_api_respond_error_print_preview(
+        response_handle, "PREVIEW_ERROR", msg, nullptr);
+    return;
   }
-  return flutter_print_flutter_print_api_print_preview_response_new();
+  flutter_print_flutter_print_api_respond_print_preview(response_handle);
 }
 
 // ---------------------------------------------------------------------------

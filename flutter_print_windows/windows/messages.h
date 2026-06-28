@@ -477,9 +477,10 @@ class FlutterPrintApi {
   //
   // Throws a [PlatformException] if the file is not found, the file type is
   // unsupported, or the print subsystem reports an error.
-  virtual std::optional<FlutterError> Print(
+  virtual void Print(
     const std::string& file_path,
-    const PrintOptions* options) = 0;
+    const PrintOptions* options,
+    std::function<void(std::optional<FlutterError> reply)> result) = 0;
   // Opens the native print-preview or print dialog for [filePath].
   //
   // **Android / iOS** — identical to [print]: the system print dialog always
@@ -495,9 +496,10 @@ class FlutterPrintApi {
   // printing to the default document viewer.
   //
   // Throws a [PlatformException] if the file is not found.
-  virtual std::optional<FlutterError> PrintPreview(
+  virtual void PrintPreview(
     const std::string& file_path,
-    const PrintOptions* options) = 0;
+    const PrintOptions* options,
+    std::function<void(std::optional<FlutterError> reply)> result) = 0;
   // Returns all printers currently available on this device.
   //
   // **Android / iOS / Web** — always returns an empty list.

@@ -1272,7 +1272,7 @@ public class Messages {
      * Throws a [PlatformException] if the file is not found, the file type is
      * unsupported, or the print subsystem reports an error.
      */
-    void print(@NonNull String filePath, @Nullable PrintOptions options);
+    void print(@NonNull String filePath, @Nullable PrintOptions options, @NonNull VoidResult result);
     /**
      * Opens the native print-preview or print dialog for [filePath].
      *
@@ -1290,7 +1290,7 @@ public class Messages {
      *
      * Throws a [PlatformException] if the file is not found.
      */
-    void printPreview(@NonNull String filePath, @Nullable PrintOptions options);
+    void printPreview(@NonNull String filePath, @Nullable PrintOptions options, @NonNull VoidResult result);
     /**
      * Returns all printers currently available on this device.
      *
@@ -1328,14 +1328,20 @@ public class Messages {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 PrintOptions optionsArg = (PrintOptions) args.get(1);
-                try {
-                  api.print(filePathArg, optionsArg);
-                  wrapped.add(0, null);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                VoidResult resultCallback =
+                    new VoidResult() {
+                      public void success() {
+                        wrapped.add(0, null);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.print(filePathArg, optionsArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -1352,14 +1358,20 @@ public class Messages {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 PrintOptions optionsArg = (PrintOptions) args.get(1);
-                try {
-                  api.printPreview(filePathArg, optionsArg);
-                  wrapped.add(0, null);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                VoidResult resultCallback =
+                    new VoidResult() {
+                      public void success() {
+                        wrapped.add(0, null);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.printPreview(filePathArg, optionsArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);

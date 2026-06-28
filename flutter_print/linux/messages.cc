@@ -1403,6 +1403,8 @@ static FlutterPrintFlutterPrintApiResponseHandle* flutter_print_flutter_print_ap
   return self;
 }
 
+G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiPrintResponse, flutter_print_flutter_print_api_print_response, FLUTTER_PRINT, FLUTTER_PRINT_API_PRINT_RESPONSE, GObject)
+
 struct _FlutterPrintFlutterPrintApiPrintResponse {
   GObject parent_instance;
 
@@ -1424,14 +1426,14 @@ static void flutter_print_flutter_print_api_print_response_class_init(FlutterPri
   G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_print_response_dispose;
 }
 
-FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new() {
+static FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new() {
   FlutterPrintFlutterPrintApiPrintResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PRINT_RESPONSE(g_object_new(flutter_print_flutter_print_api_print_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_null());
   return self;
 }
 
-FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+static FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
   FlutterPrintFlutterPrintApiPrintResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PRINT_RESPONSE(g_object_new(flutter_print_flutter_print_api_print_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
@@ -1439,6 +1441,8 @@ FlutterPrintFlutterPrintApiPrintResponse* flutter_print_flutter_print_api_print_
   fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
   return self;
 }
+
+G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiPrintPreviewResponse, flutter_print_flutter_print_api_print_preview_response, FLUTTER_PRINT, FLUTTER_PRINT_API_PRINT_PREVIEW_RESPONSE, GObject)
 
 struct _FlutterPrintFlutterPrintApiPrintPreviewResponse {
   GObject parent_instance;
@@ -1461,14 +1465,14 @@ static void flutter_print_flutter_print_api_print_preview_response_class_init(Fl
   G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_print_preview_response_dispose;
 }
 
-FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new() {
+static FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new() {
   FlutterPrintFlutterPrintApiPrintPreviewResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PRINT_PREVIEW_RESPONSE(g_object_new(flutter_print_flutter_print_api_print_preview_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_null());
   return self;
 }
 
-FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+static FlutterPrintFlutterPrintApiPrintPreviewResponse* flutter_print_flutter_print_api_print_preview_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
   FlutterPrintFlutterPrintApiPrintPreviewResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PRINT_PREVIEW_RESPONSE(g_object_new(flutter_print_flutter_print_api_print_preview_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
@@ -1600,16 +1604,8 @@ static void flutter_print_flutter_print_api_print_cb(FlBasicMessageChannel* chan
   const gchar* file_path = fl_value_get_string(value0);
   FlValue* value1 = fl_value_get_list_value(message_, 1);
   FlutterPrintPrintOptions* options = FLUTTER_PRINT_PRINT_OPTIONS(fl_value_get_custom_value_object(value1));
-  g_autoptr(FlutterPrintFlutterPrintApiPrintResponse) response = self->vtable->print(file_path, options, self->user_data);
-  if (response == nullptr) {
-    g_warning("No response returned to %s.%s", "FlutterPrintApi", "print");
-    return;
-  }
-
-  g_autoptr(GError) error = NULL;
-  if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
-    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "print", error->message);
-  }
+  g_autoptr(FlutterPrintFlutterPrintApiResponseHandle) handle = flutter_print_flutter_print_api_response_handle_new(channel, response_handle);
+  self->vtable->print(file_path, options, handle, self->user_data);
 }
 
 static void flutter_print_flutter_print_api_print_preview_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
@@ -1623,16 +1619,8 @@ static void flutter_print_flutter_print_api_print_preview_cb(FlBasicMessageChann
   const gchar* file_path = fl_value_get_string(value0);
   FlValue* value1 = fl_value_get_list_value(message_, 1);
   FlutterPrintPrintOptions* options = FLUTTER_PRINT_PRINT_OPTIONS(fl_value_get_custom_value_object(value1));
-  g_autoptr(FlutterPrintFlutterPrintApiPrintPreviewResponse) response = self->vtable->print_preview(file_path, options, self->user_data);
-  if (response == nullptr) {
-    g_warning("No response returned to %s.%s", "FlutterPrintApi", "printPreview");
-    return;
-  }
-
-  g_autoptr(GError) error = NULL;
-  if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
-    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "printPreview", error->message);
-  }
+  g_autoptr(FlutterPrintFlutterPrintApiResponseHandle) handle = flutter_print_flutter_print_api_response_handle_new(channel, response_handle);
+  self->vtable->print_preview(file_path, options, handle, self->user_data);
 }
 
 static void flutter_print_flutter_print_api_list_printers_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
@@ -1692,6 +1680,38 @@ void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* me
   g_autofree gchar* pick_printer_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pickPrinter%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) pick_printer_channel = fl_basic_message_channel_new(messenger, pick_printer_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(pick_printer_channel, nullptr, nullptr, nullptr);
+}
+
+void flutter_print_flutter_print_api_respond_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle) {
+  g_autoptr(FlutterPrintFlutterPrintApiPrintResponse) response = flutter_print_flutter_print_api_print_response_new();
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "print", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_error_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(FlutterPrintFlutterPrintApiPrintResponse) response = flutter_print_flutter_print_api_print_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "print", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_print_preview(FlutterPrintFlutterPrintApiResponseHandle* response_handle) {
+  g_autoptr(FlutterPrintFlutterPrintApiPrintPreviewResponse) response = flutter_print_flutter_print_api_print_preview_response_new();
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "printPreview", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_error_print_preview(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(FlutterPrintFlutterPrintApiPrintPreviewResponse) response = flutter_print_flutter_print_api_print_preview_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "printPreview", error->message);
+  }
 }
 
 void flutter_print_flutter_print_api_respond_list_printers(FlutterPrintFlutterPrintApiResponseHandle* response_handle, FlValue* return_value) {

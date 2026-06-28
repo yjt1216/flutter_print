@@ -66,7 +66,13 @@ FlutterPrintPlugin::~FlutterPrintPlugin() {
 // FlutterPrintApi — Print / PrintPreview
 // ---------------------------------------------------------------------------
 
-std::optional<FlutterError> FlutterPrintPlugin::Print(
+void FlutterPrintPlugin::Print(
+    const std::string& file_path, const PrintOptions* options,
+    std::function<void(std::optional<FlutterError> reply)> result) {
+  result(PrintInternal(file_path, options));
+}
+
+std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
     const std::string& file_path, const PrintOptions* options) {
   const std::wstring wPath = Utf8ToWide(file_path);
   if (GetFileAttributesW(wPath.c_str()) == INVALID_FILE_ATTRIBUTES)
@@ -106,10 +112,11 @@ std::optional<FlutterError> FlutterPrintPlugin::Print(
   return RenderOrFallback(nullptr, wPath, wPrinter);
 }
 
-std::optional<FlutterError> FlutterPrintPlugin::PrintPreview(
-    const std::string& /*file_path*/, const PrintOptions* /*options*/) {
+void FlutterPrintPlugin::PrintPreview(
+    const std::string& /*file_path*/, const PrintOptions* /*options*/,
+    std::function<void(std::optional<FlutterError> reply)> result) {
   // Preview is handled entirely in Dart via showWindowsPrintDialog.
-  return std::nullopt;
+  result(std::nullopt);
 }
 
 // ---------------------------------------------------------------------------
