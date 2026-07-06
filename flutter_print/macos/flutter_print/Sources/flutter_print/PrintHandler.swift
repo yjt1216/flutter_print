@@ -79,14 +79,12 @@ extension FlutterPrintPlugin {
 
     let mmToPts: CGFloat = 72.0 / 25.4
 
+    // Paper size is set in natural (portrait) dimensions; NSPrintInfo rotates
+    // it to match `orientation` automatically, so no manual landscape swap.
     if let ps = options?.pageSize {
-      let sizeApplied = applyNamedPaper(ps.name, to: info, landscape: isLandscape)
+      let sizeApplied = applyNamedPaper(ps.name, to: info)
       if !sizeApplied, let w = ps.width, let h = ps.height {
-        let wPts = CGFloat(w) * mmToPts
-        let hPts = CGFloat(h) * mmToPts
-        info.paperSize = isLandscape
-          ? NSSize(width: hPts, height: wPts)
-          : NSSize(width: wPts, height: hPts)
+        info.paperSize = NSSize(width: CGFloat(w) * mmToPts, height: CGFloat(h) * mmToPts)
       }
     }
 
@@ -115,13 +113,10 @@ extension FlutterPrintPlugin {
     return info
   }
 
-  /// Resolves the oriented paper size and the content rect (paper minus the
-  /// requested margins) both custom print views draw into.
+  /// Paper size (already oriented by NSPrintInfo) and the content rect both
+  /// custom print views draw into (paper minus the requested margins).
   private func layout(for info: NSPrintInfo) -> (paper: NSSize, content: NSRect) {
-    let ps = info.paperSize
-    let paper: NSSize = info.orientation == .landscape
-      ? NSSize(width: max(ps.width, ps.height), height: min(ps.width, ps.height))
-      : NSSize(width: min(ps.width, ps.height), height: max(ps.width, ps.height))
+    let paper = info.paperSize
     let content = NSRect(
       x: info.leftMargin,
       y: info.bottomMargin,
@@ -213,7 +208,7 @@ extension FlutterPrintPlugin {
   }
 
   @discardableResult
-  private func applyNamedPaper(_ name: String, to info: NSPrintInfo, landscape: Bool) -> Bool {
+  private func applyNamedPaper(_ name: String, to info: NSPrintInfo) -> Bool {
     let sizes: [String: (Double, Double)] = [
       // ISO A-series
       "A0": (841, 1189), "A1": (594, 841), "A2": (420, 594),
@@ -230,9 +225,7 @@ extension FlutterPrintPlugin {
     ]
     guard let (w, h) = sizes[name] else { return false }
     let k: CGFloat = 72.0 / 25.4
-    info.paperSize = landscape
-      ? NSSize(width: CGFloat(h) * k, height: CGFloat(w) * k)
-      : NSSize(width: CGFloat(w) * k, height: CGFloat(h) * k)
+    info.paperSize = NSSize(width: CGFloat(w) * k, height: CGFloat(h) * k)
     return true
   }
 }

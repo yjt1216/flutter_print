@@ -104,7 +104,7 @@ ignored.
 | `copies`         |         |     | ✔️   | ✔️‡     | ✔️   |     |
 | `landscape`      | ✔️      | ✔️  | ✔️   | ✔️‡    | ✔️   |    |
 | `color`          | ✔️      | ✔️  | ✔️¶  | ✔️‡    | ✔️   |    |
-| `duplexMode`     | ✔️      | ✔️  | ✔️   | ✔️‡    | ✔️§  |    |
+| `duplexMode`     | ✔️      | ✔️  | ✔️¶  | ✔️‡    | ✔️§  |    |
 
 † On iOS, with a `printerAddress` from `FlutterPrint.ios?.pickPrinter()` (e.g. `ipp://printer.local./ipp/print`).
 
@@ -113,9 +113,7 @@ All other file types are delegated to their associated application with its own 
 
 § Linux — requires CUPS.  
 
-¶ macOS — `color: false` is forwarded as the standard `print-color-mode=monochrome`
-job option. It is honoured by printers that support that option (virtually all
-modern/driverless printers); some legacy PPD drivers may use a different keyword.  
+¶ macOS — `color` and `duplexMode` can't be reflected in preview panel. 
 
 ---
 
