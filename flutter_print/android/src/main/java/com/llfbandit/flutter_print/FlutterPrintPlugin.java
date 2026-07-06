@@ -2,7 +2,9 @@ package com.llfbandit.flutter_print;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.BitmapFactory;
 import android.graphics.pdf.PdfRenderer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
@@ -17,9 +19,11 @@ import android.print.PrintManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.print.PrintHelper;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -83,7 +87,7 @@ public class FlutterPrintPlugin
   public void print(@NonNull String filePath, @Nullable Messages.PrintOptions options,
                     @NonNull Messages.VoidResult result) {
     try {
-      watchJob(handlePrint(filePath, options), result);
+      handlePrint(filePath, options, result);
     } catch (Throwable e) {
       result.error(e);
     }
@@ -92,9 +96,9 @@ public class FlutterPrintPlugin
   @Override
   public void printPreview(@NonNull String filePath, @Nullable Messages.PrintOptions options,
                            @NonNull Messages.VoidResult result) {
-    // Android's PrintManager always shows a dialog with a preview.
+    // Android's print UI always shows a dialog with a preview.
     try {
-      watchJob(handlePrint(filePath, options), result);
+      handlePrint(filePath, options, result);
     } catch (Throwable e) {
       result.error(e);
     }
@@ -116,8 +120,8 @@ public class FlutterPrintPlugin
   // Private helpers
   // -------------------------------------------------------------------------
 
-  @NonNull
-  private PrintJob handlePrint(@NonNull String filePath, @Nullable Messages.PrintOptions options) {
+  private void handlePrint(@NonNull String filePath, @Nullable Messages.PrintOptions options,
+                           @NonNull Messages.VoidResult result) throws FileNotFoundException {
     if (activity == null) {
       throw new Messages.FlutterError("NO_ACTIVITY", "Printing requires an active Activity", null);
     }
@@ -127,6 +131,16 @@ public class FlutterPrintPlugin
       throw new Messages.FlutterError("FILE_NOT_FOUND", "File not found: " + filePath, null);
     }
 
+    if (isImage(filePath)) {
+      printImage(file, options, result);
+    } else {
+      watchJob(printPdf(file, options), result);
+    }
+  }
+
+  // Prints a PDF via the framework's PrintManager, streaming the file as-is.
+  @NonNull
+  private PrintJob printPdf(@NonNull File file, @Nullable Messages.PrintOptions options) {
     PrintAttributes.Builder attrBuilder = new PrintAttributes.Builder();
 
     // When options are omitted, leave PrintAttributes empty so the system /
@@ -180,7 +194,41 @@ public class FlutterPrintPlugin
       throw new Messages.FlutterError(
           "NO_PRINT_SERVICE", "Printing is not supported on this device", null);
     }
-    return pm.print(file.getName(), new FilePrintDocumentAdapter(filePath), attrBuilder.build());
+    return pm.print(
+        file.getName(), new FilePrintDocumentAdapter(file.getPath()), attrBuilder.build());
+  }
+
+  // Prints an image via androidx PrintHelper, which loads/scales it off the main
+  // thread and shows the system print UI. onFinish fires on completion or
+  // cancellation (both success); PrintHelper exposes no failure signal.
+  private void printImage(@NonNull File file, @Nullable Messages.PrintOptions options,
+                          @NonNull Messages.VoidResult result) throws FileNotFoundException {
+    PrintHelper helper = new PrintHelper(activity);
+    helper.setScaleMode(PrintHelper.SCALE_MODE_FIT);
+
+    if (options != null) {
+      Boolean color = options.getColor();
+      if (color != null) {
+        helper.setColorMode(
+            color ? PrintHelper.COLOR_MODE_COLOR : PrintHelper.COLOR_MODE_MONOCHROME);
+      }
+      Boolean landscape = options.getLandscape();
+      if (landscape != null) {
+        helper.setOrientation(
+            landscape ? PrintHelper.ORIENTATION_LANDSCAPE : PrintHelper.ORIENTATION_PORTRAIT);
+      }
+    }
+
+    helper.printBitmap(file.getName(), Uri.fromFile(file), result::success);
+  }
+
+  // Peeks the file header; treats anything BitmapFactory reports as image/* as
+  // an image. PDFs and unreadable files fall through to the PDF path.
+  private static boolean isImage(@NonNull String filePath) {
+    BitmapFactory.Options opts = new BitmapFactory.Options();
+    opts.inJustDecodeBounds = true;
+    BitmapFactory.decodeFile(filePath, opts);
+    return opts.outMimeType != null && opts.outMimeType.startsWith("image/");
   }
 
   // No completion callback exists for print jobs, so poll for a terminal state.
