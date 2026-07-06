@@ -1,3 +1,15 @@
+## 0.4.0
+* feat: Make print options nullable to get system defaults.
+* feat(android): Implement image print.
+* fix(android): Report PDF page count for page-range selection.
+* fix(Android): Copy off the main thread.
+* fix(android): Don't report print job result too early.
+* fix(ios): silent errors.
+* fix(macos): Landspace applied twice.
+* feat(macos): report printer capabilities in listPrinters.
+* fix(macos): page size/margins.
+* fix(macos): Open default apps for sanboxed apps.
+
 ## 0.3.1
 * fix(macos): Broken in 0.3.0. Syncs with new API.
 * fix(ios): Broken in 0.3.0. Syncs with new API.
