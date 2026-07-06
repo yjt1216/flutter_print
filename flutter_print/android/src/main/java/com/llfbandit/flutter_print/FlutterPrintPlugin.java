@@ -2,6 +2,7 @@ package com.llfbandit.flutter_print;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
@@ -277,10 +278,22 @@ public class FlutterPrintPlugin
       PrintDocumentInfo info = new PrintDocumentInfo
           .Builder(new File(filePath).getName())
           .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-          .setPageCount(PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+          .setPageCount(pageCount(filePath))
           .build();
 
       callback.onLayoutFinished(info, !newAttrs.equals(oldAttrs));
+    }
+
+    // Report the PDF page count so the dialog enables page-range selection.
+    // Falls back to PAGE_COUNT_UNKNOWN for a non-PDF or unreadable file.
+    private static int pageCount(String filePath) {
+      try (ParcelFileDescriptor pfd = ParcelFileDescriptor.open(
+              new File(filePath), ParcelFileDescriptor.MODE_READ_ONLY);
+           PdfRenderer renderer = new PdfRenderer(pfd)) {
+        return renderer.getPageCount();
+      } catch (Exception e) {
+        return PrintDocumentInfo.PAGE_COUNT_UNKNOWN;
+      }
     }
 
     @Override
