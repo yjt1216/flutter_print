@@ -26,15 +26,16 @@ extension FlutterPrintPlugin {
         throw PigeonError(code: "INVALID_FILE", message: "Cannot open PDF", details: nil)
       }
       try printRendered(url: fileURL, options: options, showPanel: showPanel) { info in
-        let ps = info.paperSize
-        let paperSize: NSSize = info.orientation == .landscape
-          ? NSSize(width: max(ps.width, ps.height), height: min(ps.width, ps.height))
-          : NSSize(width: min(ps.width, ps.height), height: max(ps.width, ps.height))
-        return PDFPagePrintView(document: doc, paperSize: paperSize)
+        let l = self.layout(for: info)
+        return PDFPagePrintView(document: doc, paperSize: l.paper, contentRect: l.content)
       }
     } else if let image = NSImage(contentsOf: fileURL) {
       try printRendered(url: fileURL, options: options, showPanel: showPanel) { info in
-        ImagePrintView(image: image, bounds: info.imageablePageBounds)
+        let l = self.layout(for: info)
+        return ImagePrintView(
+          image: image,
+          bounds: NSRect(origin: .zero, size: l.paper),
+          contentRect: l.content)
       }
     } else if showPanel {
       DispatchQueue.main.async { NSWorkspace.shared.open(fileURL) }
@@ -94,6 +95,14 @@ extension FlutterPrintPlugin {
       info.bottomMargin = CGFloat(m.bottom) * mmToPts
       info.leftMargin   = CGFloat(m.left)   * mmToPts
       info.rightMargin  = CGFloat(m.right)  * mmToPts
+    } else {
+      // No margins requested: fill the whole sheet. Without this the inherited
+      // NSPrintInfo.shared defaults (~1 inch each side) would silently shrink
+      // the rendered PDF/image.
+      info.topMargin = 0
+      info.bottomMargin = 0
+      info.leftMargin = 0
+      info.rightMargin = 0
     }
 
     PMSetCopies(OpaquePointer(info.pmPrintSettings()), UInt32(options?.copies ?? 1), false)
@@ -104,6 +113,21 @@ extension FlutterPrintPlugin {
     }
 
     return info
+  }
+
+  /// Resolves the oriented paper size and the content rect (paper minus the
+  /// requested margins) both custom print views draw into.
+  private func layout(for info: NSPrintInfo) -> (paper: NSSize, content: NSRect) {
+    let ps = info.paperSize
+    let paper: NSSize = info.orientation == .landscape
+      ? NSSize(width: max(ps.width, ps.height), height: min(ps.width, ps.height))
+      : NSSize(width: min(ps.width, ps.height), height: max(ps.width, ps.height))
+    let content = NSRect(
+      x: info.leftMargin,
+      y: info.bottomMargin,
+      width:  max(0, paper.width  - info.leftMargin - info.rightMargin),
+      height: max(0, paper.height - info.topMargin  - info.bottomMargin))
+    return (paper, content)
   }
 
   private func printRendered(
@@ -162,6 +186,23 @@ extension FlutterPrintPlugin {
       case .longEdge:  args += ["-o", "sides=two-sided-long-edge"]
       case .shortEdge: args += ["-o", "sides=two-sided-short-edge"]
       }
+    }
+    let mmToPts = 72.0 / 25.4
+    if let ps = options?.pageSize {
+      if !ps.name.isEmpty {
+        // Most CUPS drivers accept the well-known name directly (e.g. "A4").
+        args += ["-o", "media=\(ps.name)"]
+      } else if let w = ps.width, let h = ps.height {
+        args += ["-o", "media=Custom.\(Int(w * mmToPts))x\(Int(h * mmToPts))"]
+      }
+    }
+    if let m = options?.margins {
+      // Best-effort: honored by CUPS' built-in filters, ignored by drivers
+      // that manage their own imageable area.
+      args += ["-o", "page-top=\(Int(m.top * mmToPts))"]
+      args += ["-o", "page-bottom=\(Int(m.bottom * mmToPts))"]
+      args += ["-o", "page-left=\(Int(m.left * mmToPts))"]
+      args += ["-o", "page-right=\(Int(m.right * mmToPts))"]
     }
     args.append(url.path)
 
