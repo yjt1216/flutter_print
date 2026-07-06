@@ -42,6 +42,7 @@ std::optional<FlutterError> RenderTextToDC(HDC hdc, const std::wstring& path,
 // The ShellExecuteW fallback path does not honour |copies|.
 std::optional<FlutterError> RenderOrFallback(HDC hdc,
                                               const std::wstring& wPath,
+                                              const std::string& mime,
                                               const std::wstring& printerName,
                                               int copies = 1);
 

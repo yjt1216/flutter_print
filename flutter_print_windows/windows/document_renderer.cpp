@@ -443,9 +443,9 @@ std::optional<FlutterError> RenderTextToDC(HDC hdc, const std::wstring& path,
 
 std::optional<FlutterError> RenderOrFallback(HDC hdc,
                                               const std::wstring& wPath,
+                                              const std::string& mime,
                                               const std::wstring& printerName,
                                               int copies) {
-  const std::string mime = GetMimeType(wPath);
   if (mime.rfind("image/", 0) == 0) {
     auto err = RenderImageToDC(hdc, wPath, copies);
     DeleteDC(hdc);

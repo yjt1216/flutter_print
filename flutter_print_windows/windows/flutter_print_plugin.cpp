@@ -111,13 +111,13 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
       return FlutterError("PRINTER_ERROR",
                           "Cannot create printer DC for: " +
                               WideToUtf8(wPrinter.c_str()));
-    return RenderOrFallback(hdc, wPath, wPrinter, softwareCopies);
+    return RenderOrFallback(hdc, wPath, mime, wPrinter, softwareCopies);
   }
 
   // Other file types: delegate to the file's associated application.
   const std::string* pn = options ? options->printer_address() : nullptr;
   const std::wstring wPrinter = (pn && !pn->empty()) ? Utf8ToWide(*pn) : std::wstring{};
-  return RenderOrFallback(nullptr, wPath, wPrinter);
+  return RenderOrFallback(nullptr, wPath, mime, wPrinter);
 }
 
 void FlutterPrintPlugin::PrintPreview(
