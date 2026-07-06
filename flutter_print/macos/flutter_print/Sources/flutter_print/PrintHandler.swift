@@ -42,16 +42,17 @@ extension FlutterPrintPlugin {
       }
       printRendered(url: fileURL, options: options, showPanel: showPanel,
                     completion: completion) { info in
-        let ps = info.paperSize
-        let paperSize: NSSize = info.orientation == .landscape
-          ? NSSize(width: max(ps.width, ps.height), height: min(ps.width, ps.height))
-          : NSSize(width: min(ps.width, ps.height), height: max(ps.width, ps.height))
-        return PDFPagePrintView(document: doc, paperSize: paperSize)
+        let l = self.layout(for: info)
+        return PDFPagePrintView(document: doc, paperSize: l.paper, contentRect: l.content)
       }
     } else if let image = NSImage(contentsOf: fileURL) {
       printRendered(url: fileURL, options: options, showPanel: showPanel,
                     completion: completion) { info in
-        ImagePrintView(image: image, bounds: info.imageablePageBounds)
+        let l = self.layout(for: info)
+        return ImagePrintView(
+          image: image,
+          bounds: NSRect(origin: .zero, size: l.paper),
+          contentRect: l.content)
       }
     } else if showPanel {
       openInDefaultApp(fileURL, errorCode: "PREVIEW_ERROR", completion: completion)
@@ -105,7 +106,6 @@ extension FlutterPrintPlugin {
 
     // Each option is applied only when provided; unset fields keep the system
     // default print settings.
-    let isLandscape = options?.landscape ?? false
     if let landscape = options?.landscape {
       info.orientation = landscape ? .landscape : .portrait
     }
