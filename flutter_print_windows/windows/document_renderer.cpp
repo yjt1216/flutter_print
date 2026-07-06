@@ -29,6 +29,18 @@ static void EnsurePdfiumInit() {
   });
 }
 
+// GDI+ tokens aren't refcounted, so per-call Startup/Shutdown races across the
+// print and preview threads. Init once for the process; never shut down.
+static std::once_flag g_gdiplus_init_flag;
+
+static void EnsureGdiplusInit() {
+  std::call_once(g_gdiplus_init_flag, []() {
+    Gdiplus::GdiplusStartupInput input;
+    ULONG_PTR token = 0;
+    Gdiplus::GdiplusStartup(&token, &input, nullptr);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -143,10 +155,7 @@ static HRESULT GetEncoderClsid(const WCHAR* mimeType, CLSID* pClsid) {
 
 std::optional<FlutterError> RenderImageToDC(HDC hdc, const std::wstring& path,
                                             int copies) {
-  Gdiplus::GdiplusStartupInput input;
-  ULONG_PTR token = 0;
-  if (Gdiplus::GdiplusStartup(&token, &input, nullptr) != Gdiplus::Ok)
-    return FlutterError("GDI_ERROR", "GDI+ initialisation failed");
+  EnsureGdiplusInit();
 
   if (copies < 1) copies = 1;
 
@@ -190,7 +199,6 @@ std::optional<FlutterError> RenderImageToDC(HDC hdc, const std::wstring& path,
     }
   }
 
-  Gdiplus::GdiplusShutdown(token);
   return err;
 }
 
@@ -522,11 +530,7 @@ int GetPdfPageCount(const std::wstring& path) {
 std::vector<uint8_t> RenderPdfPageToPng(const std::wstring& path,
                                          int pageIndex,
                                          double dpi) {
-  Gdiplus::GdiplusStartupInput gdipInput;
-  ULONG_PTR gdipToken = 0;
-  if (Gdiplus::GdiplusStartup(&gdipToken, &gdipInput, nullptr) != Gdiplus::Ok)
-    return {};
-
+  EnsureGdiplusInit();
   EnsurePdfiumInit();
   std::lock_guard<std::mutex> lock(g_pdfium_mtx);
   std::vector<uint8_t> result;
@@ -577,8 +581,6 @@ std::vector<uint8_t> RenderPdfPageToPng(const std::wstring& path,
     }
     FPDF_CloseDocument(doc);
   }
-
-  Gdiplus::GdiplusShutdown(gdipToken);
 
   return result;
 }
