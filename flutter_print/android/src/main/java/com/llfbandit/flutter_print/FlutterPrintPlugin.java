@@ -182,14 +182,8 @@ public class FlutterPrintPlugin
     return pm.print(file.getName(), new FilePrintDocumentAdapter(filePath), attrBuilder.build());
   }
 
-  /**
-   * Polls the {@link PrintJob} to its terminal state and completes {@code result}.
-   *
-   * Android exposes no completion callback for print jobs, so the state is
-   * polled on the main thread. Completion and user cancellation both resolve
-   * as success (matching the iOS/macOS dialog behaviour where cancelling is a
-   * normal outcome); only a genuine failure is surfaced as an error.
-   */
+  // No completion callback exists for print jobs, so poll for a terminal state.
+  // Completion and cancellation both succeed (as on iOS/macOS); only failure errors.
   private static void watchJob(@NonNull PrintJob job, @NonNull Messages.VoidResult result) {
     Handler handler = new Handler(Looper.getMainLooper());
     handler.post(new Runnable() {
@@ -293,24 +287,29 @@ public class FlutterPrintPlugin
     public void onWrite(PageRange[] pages, ParcelFileDescriptor destination,
                         CancellationSignal cancel, WriteResultCallback callback) {
 
-      try (InputStream in = new FileInputStream(filePath);
-           OutputStream out = new FileOutputStream(destination.getFileDescriptor())) {
+      // Copy off the main thread; post callbacks back to it.
+      Handler handler = new Handler(Looper.getMainLooper());
 
-        byte[] buf = new byte[8192];
-        int len;
+      new Thread(() -> {
+        try (InputStream in = new FileInputStream(filePath);
+             OutputStream out = new FileOutputStream(destination.getFileDescriptor())) {
 
-        while ((len = in.read(buf)) > 0) {
-          if (cancel.isCanceled()) {
-            callback.onWriteCancelled();
-            return;
+          byte[] buf = new byte[8192];
+          int len;
+
+          while ((len = in.read(buf)) > 0) {
+            if (cancel.isCanceled()) {
+              handler.post(callback::onWriteCancelled);
+              return;
+            }
+            out.write(buf, 0, len);
           }
-          out.write(buf, 0, len);
-        }
 
-        callback.onWriteFinished(new PageRange[]{PageRange.ALL_PAGES});
-      } catch (IOException e) {
-        callback.onWriteFailed(e.getMessage());
-      }
+          handler.post(() -> callback.onWriteFinished(new PageRange[]{PageRange.ALL_PAGES}));
+        } catch (IOException e) {
+          handler.post(() -> callback.onWriteFailed(e.getMessage()));
+        }
+      }, "flutter_print-write").start();
     }
   }
 }
