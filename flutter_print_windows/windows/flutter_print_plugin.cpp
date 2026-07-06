@@ -69,7 +69,16 @@ FlutterPrintPlugin::~FlutterPrintPlugin() {
 void FlutterPrintPlugin::Print(
     const std::string& file_path, const PrintOptions* options,
     std::function<void(std::optional<FlutterError> reply)> result) {
-  result(PrintInternal(file_path, options));
+  // Spool off the platform thread so the UI stays responsive. options is owned
+  // by the caller and freed on return, so copy it (null = printer defaults).
+  std::optional<PrintOptions> optionsCopy;
+  if (options) optionsCopy = *options;
+  std::thread([this, file_path, optionsCopy = std::move(optionsCopy),
+               result = std::move(result), alive = alive_]() mutable {
+    auto reply = PrintInternal(file_path,
+                               optionsCopy ? &*optionsCopy : nullptr);
+    if (alive->load()) result(std::move(reply));
+  }).detach();
 }
 
 std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
