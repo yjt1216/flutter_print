@@ -8,6 +8,7 @@
 
 #include <fpdfview.h>
 #include <algorithm>
+#include <memory>
 #include <mutex>
 
 #pragma comment(lib, "gdiplus.lib")
@@ -45,10 +46,12 @@ static void EnsureGdiplusInit() {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// Decode via WIC and draw centred/scaled into hdc.
-// Used as a fallback for formats GDI+ does not support (WebP, HEIC, …).
-static std::optional<FlutterError> RenderViaWIC(
-    HDC hdc, const std::wstring& path, int pw, int ph) {
+// Decode |path| via WIC into a 32bpp BGRA GDI+ bitmap; fallback for formats
+// GDI+ can't decode (WebP, HEIC, …). |outPixels| backs |outBmp|, so it must
+// outlive it.
+static std::optional<FlutterError> DecodeViaWIC(
+    const std::wstring& path, std::vector<BYTE>& outPixels,
+    std::unique_ptr<Gdiplus::Bitmap>& outBmp) {
   HRESULT coinit_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   IWICImagingFactory* factory = nullptr;
@@ -107,26 +110,18 @@ static std::optional<FlutterError> RenderViaWIC(
     if (coinit_hr == S_OK) CoUninitialize();
     return FlutterError("IMAGE_ERROR", "WIC returned empty image");
   }
-  std::vector<BYTE> pixels(static_cast<size_t>(iw) * ih * 4);
+  outPixels.resize(static_cast<size_t>(iw) * ih * 4);
   hr = converter->CopyPixels(nullptr, iw * 4,
-                              static_cast<UINT>(pixels.size()), pixels.data());
+                              static_cast<UINT>(outPixels.size()),
+                              outPixels.data());
   converter->Release();
   if (coinit_hr == S_OK) CoUninitialize();
   if (FAILED(hr))
     return FlutterError("IMAGE_ERROR", "WIC pixel copy failed");
 
-  Gdiplus::Bitmap bmp(static_cast<INT>(iw), static_cast<INT>(ih),
-                       static_cast<INT>(iw) * 4, PixelFormat32bppARGB,
-                       pixels.data());
-  const float s  = std::min(static_cast<float>(pw) / iw,
-                             static_cast<float>(ph) / ih);
-  Gdiplus::Graphics g(hdc);
-  g.SetPageUnit(Gdiplus::UnitPixel);
-  g.DrawImage(&bmp,
-              (pw - static_cast<int>(iw * s)) / 2,
-              (ph - static_cast<int>(ih * s)) / 2,
-              static_cast<int>(iw * s),
-              static_cast<int>(ih * s));
+  outBmp = std::make_unique<Gdiplus::Bitmap>(
+      static_cast<INT>(iw), static_cast<INT>(ih), static_cast<INT>(iw) * 4,
+      PixelFormat32bppARGB, outPixels.data());
   return std::nullopt;
 }
 
@@ -162,41 +157,46 @@ std::optional<FlutterError> RenderImageToDC(HDC hdc, const std::wstring& path,
   const int pw = GetDeviceCaps(hdc, HORZRES);
   const int ph = GetDeviceCaps(hdc, VERTRES);
 
+  // Decode once; every copy draws the same bitmap.
+  Gdiplus::Image gdiImg(path.c_str());
+  std::vector<BYTE> wicPixels;                 // backs wicBmp; must outlive it
+  std::unique_ptr<Gdiplus::Bitmap> wicBmp;
+  Gdiplus::Image* img = nullptr;
+  if (gdiImg.GetLastStatus() == Gdiplus::Ok) {
+    img = &gdiImg;
+  } else {
+    // GDI+ can't decode this format (e.g. WebP, HEIC) — try WIC.
+    if (auto err = DecodeViaWIC(path, wicPixels, wicBmp)) return err;
+    img = wicBmp.get();
+  }
+
+  const UINT iw = img->GetWidth(), ih = img->GetHeight();
+  const float s = std::min(static_cast<float>(pw) / iw,
+                           static_cast<float>(ph) / ih);
+  const int dx = (pw - static_cast<int>(iw * s)) / 2;
+  const int dy = (ph - static_cast<int>(ih * s)) / 2;
+  const int dw = static_cast<int>(iw * s);
+  const int dh = static_cast<int>(ih * s);
+
   DOCINFOW di = {};
   di.cbSize      = sizeof(di);
   di.lpszDocName = path.c_str();
 
   std::optional<FlutterError> err;
-  {
-    Gdiplus::Image img(path.c_str());
-    if (StartDoc(hdc, &di) > 0) {
-      for (int c = 0; c < copies && !err; ++c) {
-        if (StartPage(hdc) > 0) {
-          if (img.GetLastStatus() == Gdiplus::Ok) {
-            // GDI+ handles this format natively.
-            const UINT iw = img.GetWidth(), ih = img.GetHeight();
-            const float s = std::min(static_cast<float>(pw) / iw,
-                                     static_cast<float>(ph) / ih);
-            Gdiplus::Graphics g(hdc);
-            g.SetPageUnit(Gdiplus::UnitPixel);
-            g.DrawImage(&img,
-                        (pw - static_cast<int>(iw * s)) / 2,
-                        (ph - static_cast<int>(ih * s)) / 2,
-                        static_cast<int>(iw * s),
-                        static_cast<int>(ih * s));
-          } else {
-            // GDI+ can't decode this format (e.g. WebP, HEIC) — try WIC.
-            err = RenderViaWIC(hdc, path, pw, ph);
-          }
-          EndPage(hdc);
-        } else {
-          err = FlutterError("PRINT_ERROR", "StartPage failed");
-        }
+  if (StartDoc(hdc, &di) > 0) {
+    for (int c = 0; c < copies && !err; ++c) {
+      if (StartPage(hdc) > 0) {
+        Gdiplus::Graphics g(hdc);
+        g.SetPageUnit(Gdiplus::UnitPixel);
+        g.DrawImage(img, dx, dy, dw, dh);
+        EndPage(hdc);
+      } else {
+        err = FlutterError("PRINT_ERROR", "StartPage failed");
       }
-      EndDoc(hdc);
-    } else {
-      err = FlutterError("PRINT_ERROR", "StartDoc failed");
     }
+    EndDoc(hdc);
+  } else {
+    err = FlutterError("PRINT_ERROR", "StartDoc failed");
   }
 
   return err;
