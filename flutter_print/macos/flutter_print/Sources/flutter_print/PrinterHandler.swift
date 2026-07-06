@@ -11,6 +11,7 @@ extension FlutterPrintPlugin {
     // so enumerate on a background queue to avoid stalling the platform thread.
     DispatchQueue.global(qos: .userInitiated).async {
       var availabilityMap: [String: Bool] = [:]
+      var capabilitiesMap: [String: PrinterCapabilities] = [:]
       var listRef: Unmanaged<CFArray>?
       if PMServerCreatePrinterList(nil, &listRef) == noErr,
          let cfArray = listRef?.takeRetainedValue() {
@@ -23,6 +24,7 @@ extension FlutterPrintPlugin {
           PMPrinterGetState(pmPrinter, &state)
           availabilityMap[name] = (state == PMPrinterState(kPMPrinterIdle)
                                 || state == PMPrinterState(kPMPrinterProcessing))
+          capabilitiesMap[name] = Self.capabilities(for: pmPrinter)
         }
       }
 
@@ -32,16 +34,110 @@ extension FlutterPrintPlugin {
           label: name,
           address: name,
           isDefault: name == defaultName,
-          capabilities: PrinterCapabilities(
-            colorCapability: .unknown,
-            supportsDuplex: nil,
-            maxCopies: nil,
-            supportedPageSizes: []
-          ),
+          capabilities: capabilitiesMap[name] ?? Self.unknownCapabilities,
           isAvailable: availabilityMap[name]
         )
       }
       completion(.success(printers))
     }
+  }
+
+  private static let unknownCapabilities = PrinterCapabilities(
+    colorCapability: .unknown,
+    supportsDuplex: nil,
+    maxCopies: nil,
+    supportedPageSizes: []
+  )
+
+  /// Page sizes from the paper list; color/duplex/max-copies from the PPD.
+  /// Both paths work inside the App Sandbox; PPD fields degrade to unknown/nil
+  /// if the read ever fails.
+  private static func capabilities(for printer: PMPrinter) -> PrinterCapabilities {
+    let pageSizes = supportedPageSizes(for: printer)
+
+    var color: ColorCapability = .unknown
+    var supportsDuplex: Bool? = nil
+    var maxCopies: Int64? = nil
+    if let ppd = ppdText(for: printer) {
+      let parsed = parsePpd(ppd)
+      color = parsed.color
+      supportsDuplex = parsed.supportsDuplex
+      maxCopies = parsed.maxCopies
+    }
+
+    return PrinterCapabilities(
+      colorCapability: color,
+      supportsDuplex: supportsDuplex,
+      maxCopies: maxCopies,
+      supportedPageSizes: pageSizes
+    )
+  }
+
+  private static func supportedPageSizes(for printer: PMPrinter) -> [String] {
+    var paperListRef: Unmanaged<CFArray>?
+    guard PMPrinterGetPaperList(printer, &paperListRef) == noErr,
+          let cfArray = paperListRef?.takeUnretainedValue() else { return [] }
+
+    var result: [String] = []
+    var seen = Set<String>()
+    for i in 0..<CFArrayGetCount(cfArray) {
+      guard let rawPtr = CFArrayGetValueAtIndex(cfArray, i) else { continue }
+      let paper = unsafeBitCast(rawPtr, to: PMPaper.self)
+      var nameRef: Unmanaged<CFString>?
+      guard PMPaperGetPPDPaperName(paper, &nameRef) == noErr,
+            let ppdName = nameRef?.takeUnretainedValue() as String? else { continue }
+      if let mapped = ppdPageSizeName[ppdName], seen.insert(mapped).inserted {
+        result.append(mapped)
+      }
+    }
+    return result
+  }
+
+  private static func ppdText(for printer: PMPrinter) -> String? {
+    var urlRef: Unmanaged<CFURL>?
+    guard PMPrinterCopyDescriptionURL(printer, kPMPPDDescriptionType as CFString, &urlRef) == noErr,
+          let url = urlRef?.takeRetainedValue() as URL? else { return nil }
+    // isoLatin1 so no byte sequence can fail to decode.
+    return try? String(contentsOf: url, encoding: .isoLatin1)
+  }
+
+  /// PPD paper-name keywords mapped to the plugin's well-known names
+  /// (see `applyNamedPaper`); unlisted keywords are dropped.
+  private static let ppdPageSizeName: [String: String] = [
+    "A0": "A0", "A1": "A1", "A2": "A2", "A3": "A3",
+    "A4": "A4", "A5": "A5", "A6": "A6",
+    "B4": "B4", "ISOB4": "B4", "B5": "B5", "ISOB5": "B5",
+    "JISB4": "JIS B4", "JISB5": "JIS B5",
+    "Letter": "Letter", "Legal": "Legal",
+    "Tabloid": "Tabloid", "Ledger": "Tabloid", "11x17": "Tabloid",
+    "Executive": "Executive",
+    "C5": "C5", "ISOC5": "C5", "EnvC5": "C5",
+    "DL": "DL", "EnvDL": "DL",
+  ]
+
+  private static func parsePpd(
+    _ ppd: String
+  ) -> (color: ColorCapability, supportsDuplex: Bool, maxCopies: Int64?) {
+    var color: ColorCapability = .unknown
+    // No Duplex section in the PPD means no duplex support → false, not unknown.
+    var supportsDuplex = false
+    var maxCopies: Int64? = nil
+
+    ppd.enumerateLines { line, _ in
+      if line.hasPrefix("*ColorDevice:") {
+        let value = line.dropFirst("*ColorDevice:".count)
+          .trimmingCharacters(in: .whitespaces)
+        color = value.caseInsensitiveCompare("True") == .orderedSame
+          ? .supported : .monochrome
+      } else if line.hasPrefix("*OpenUI *Duplex") {
+        supportsDuplex = true
+      } else if line.hasPrefix("*cupsMaxCopies:") {
+        let value = line.dropFirst("*cupsMaxCopies:".count)
+          .trimmingCharacters(in: CharacterSet(charactersIn: " \t\""))
+        if let n = Int64(value) { maxCopies = n }
+      }
+    }
+
+    return (color, supportsDuplex, maxCopies)
   }
 }
