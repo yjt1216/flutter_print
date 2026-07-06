@@ -4,11 +4,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.print.PageRange;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintDocumentInfo;
+import android.print.PrintJob;
 import android.print.PrintManager;
 
 import androidx.annotation.NonNull;
@@ -79,8 +82,7 @@ public class FlutterPrintPlugin
   public void print(@NonNull String filePath, @Nullable Messages.PrintOptions options,
                     @NonNull Messages.VoidResult result) {
     try {
-      handlePrint(filePath, options);
-      result.success();
+      watchJob(handlePrint(filePath, options), result);
     } catch (Throwable e) {
       result.error(e);
     }
@@ -91,8 +93,7 @@ public class FlutterPrintPlugin
                            @NonNull Messages.VoidResult result) {
     // Android's PrintManager always shows a dialog with a preview.
     try {
-      handlePrint(filePath, options);
-      result.success();
+      watchJob(handlePrint(filePath, options), result);
     } catch (Throwable e) {
       result.error(e);
     }
@@ -114,7 +115,8 @@ public class FlutterPrintPlugin
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private void handlePrint(@NonNull String filePath, @Nullable Messages.PrintOptions options) {
+  @NonNull
+  private PrintJob handlePrint(@NonNull String filePath, @Nullable Messages.PrintOptions options) {
     if (activity == null) {
       throw new Messages.FlutterError("NO_ACTIVITY", "Printing requires an active Activity", null);
     }
@@ -173,7 +175,37 @@ public class FlutterPrintPlugin
     }
 
     PrintManager pm = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
-    pm.print(file.getName(), new FilePrintDocumentAdapter(filePath), attrBuilder.build());
+    if (pm == null) {
+      throw new Messages.FlutterError(
+          "NO_PRINT_SERVICE", "Printing is not supported on this device", null);
+    }
+    return pm.print(file.getName(), new FilePrintDocumentAdapter(filePath), attrBuilder.build());
+  }
+
+  /**
+   * Polls the {@link PrintJob} to its terminal state and completes {@code result}.
+   *
+   * Android exposes no completion callback for print jobs, so the state is
+   * polled on the main thread. Completion and user cancellation both resolve
+   * as success (matching the iOS/macOS dialog behaviour where cancelling is a
+   * normal outcome); only a genuine failure is surfaced as an error.
+   */
+  private static void watchJob(@NonNull PrintJob job, @NonNull Messages.VoidResult result) {
+    Handler handler = new Handler(Looper.getMainLooper());
+    handler.post(new Runnable() {
+      @Override
+      public void run() {
+        if (job.isCompleted() || job.isCancelled()) {
+          result.success();
+        } else if (job.isFailed()) {
+          result.error(new Messages.FlutterError(
+              "PRINT_FAILED", "Print job failed", null));
+        } else {
+          // Still queued, started or blocked; keep waiting for a terminal state.
+          handler.postDelayed(this, 200);
+        }
+      }
+    });
   }
 
   private static int mmToMils(double mm) {
