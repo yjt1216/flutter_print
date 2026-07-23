@@ -8,15 +8,10 @@ cmake_policy(VERSION 3.14...3.25)
 set(PLUGIN_NAME "flutter_print_windows_plugin")
 
 # ---------------------------------------------------------------------------
-# PDFium — prebuilt binaries from https://github.com/bblanchon/pdfium-binaries
+# PDFium — vendored under windows/vendor/ (see vendor/README.md)
 # ---------------------------------------------------------------------------
-include(FetchContent)
-FetchContent_Declare(
-  pdfium
-  URL      "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/7857/pdfium-win-x64.tgz"
-  URL_HASH "SHA256=b904e3898f952984fb744e0c8eb36512b5ee527124796108ed419a5b4da3c6d9"
-)
-FetchContent_MakeAvailable(pdfium)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/pdfium_vendor.cmake")
+flutter_print_resolve_pdfium(PDFIUM_ROOT)
 
 # ---------------------------------------------------------------------------
 # Plugin sources
@@ -49,17 +44,17 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(${PLUGIN_NAME} PRIVATE
-  "${pdfium_SOURCE_DIR}/include")
+  "${PDFIUM_ROOT}/include")
 
 target_link_libraries(${PLUGIN_NAME} PRIVATE
   flutter
   flutter_wrapper_plugin
   gdiplus
-  "${pdfium_SOURCE_DIR}/lib/pdfium.dll.lib"
+  "${PDFIUM_ROOT}/lib/pdfium.dll.lib"
 )
 
 # pdfium.dll must ship alongside the plugin.
 set(flutter_print_windows_bundled_libraries
-  "${pdfium_SOURCE_DIR}/bin/pdfium.dll"
+  "${PDFIUM_ROOT}/bin/pdfium.dll"
   PARENT_SCOPE
 )
