@@ -48,6 +48,18 @@ class FlutterPrintWeb extends FlutterPrintPlatform {
   @override
   Future<PrinterInfo?> pickPrinter() async => null;
 
+  @override
+  Future<List<PrintJobInfo>> listPrintJobs(String printerAddress) async =>
+      const [];
+
+  @override
+  Future<int> printSubmit(String filePath, {PrintOptions? options}) async => -1;
+
+  @override
+  Future<void> cancelPrintJob(String printerAddress, int jobId) async {
+    throw UnsupportedError('cancelPrintJob is not supported on web');
+  }
+
   // ---------------------------------------------------------------------------
 
   Future<void> _printUrl(String url) async {

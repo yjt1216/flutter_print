@@ -30,6 +30,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
@@ -40,6 +42,20 @@ public class FlutterPrintPlugin
 
   @Nullable
   private Activity activity;
+
+  private final Map<Long, TrackedPrintJob> trackedJobs = new ConcurrentHashMap<>();
+
+  private static final class TrackedPrintJob {
+    final String printerAddress;
+    final String title;
+    final PrintJob job;
+
+    TrackedPrintJob(String printerAddress, String title, PrintJob job) {
+      this.printerAddress = printerAddress;
+      this.title = title;
+      this.job = job;
+    }
+  }
 
   // -------------------------------------------------------------------------
   // FlutterPlugin
@@ -116,6 +132,82 @@ public class FlutterPrintPlugin
     result.success(null);
   }
 
+  @Override
+  public void listPrintJobs(@NonNull String printerAddress,
+                            @NonNull Messages.Result<List<Messages.PrintJobInfo>> result) {
+    List<Messages.PrintJobInfo> out = new ArrayList<>();
+    for (Map.Entry<Long, TrackedPrintJob> entry : trackedJobs.entrySet()) {
+      TrackedPrintJob tracked = entry.getValue();
+      if (printerAddress != null && !printerAddress.isEmpty()
+          && !printerAddress.equals(tracked.printerAddress)) {
+        continue;
+      }
+      PrintJob job = tracked.job;
+      if (job.isCompleted() || job.isCancelled() || job.isFailed()) {
+        trackedJobs.remove(entry.getKey());
+      }
+      out.add(new Messages.PrintJobInfo.Builder()
+          .setId(entry.getKey())
+          .setTitle(tracked.title)
+          .setRawStatus((long) androidRawStatus(job))
+          .build());
+    }
+    result.success(out);
+  }
+
+  @Override
+  public void printSubmit(@NonNull String filePath, @Nullable Messages.PrintOptions options,
+                          @NonNull Messages.Result<Long> result) {
+    try {
+      if (activity == null) {
+        throw new Messages.FlutterError("NO_ACTIVITY", "Printing requires an active Activity", null);
+      }
+      File file = new File(filePath);
+      if (!file.exists()) {
+        throw new Messages.FlutterError("FILE_NOT_FOUND", "File not found: " + filePath, null);
+      }
+      if (isImage(filePath)) {
+        result.success(-1L);
+        return;
+      }
+      PrintJob job = printPdf(file, options);
+      long id = job.getId();
+      String address = options != null && options.getPrinterAddress() != null
+          ? options.getPrinterAddress()
+          : "";
+      trackedJobs.put(id, new TrackedPrintJob(address, file.getName(), job));
+      result.success(id);
+    } catch (Throwable e) {
+      result.error(e);
+    }
+  }
+
+  @Override
+  public void cancelPrintJob(@NonNull String printerAddress, @NonNull Long jobId,
+                             @NonNull Messages.VoidResult result) {
+    TrackedPrintJob tracked = trackedJobs.get(jobId);
+    if (tracked == null) {
+      result.error(new Messages.FlutterError(
+          "JOB_NOT_FOUND", "No tracked print job with id " + jobId, null));
+      return;
+    }
+    if (tracked.job.cancel()) {
+      result.success();
+    } else {
+      result.error(new Messages.FlutterError(
+          "CANCEL_FAILED", "Could not cancel print job " + jobId, null));
+    }
+  }
+
+  private static int androidRawStatus(@NonNull PrintJob job) {
+    if (job.isFailed()) return 7;
+    if (job.isCancelled()) return 6;
+    if (job.isCompleted()) return 5;
+    if (job.isBlocked()) return 4;
+    if (job.isStarted()) return 2;
+    return 1;
+  }
+
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
@@ -134,7 +226,10 @@ public class FlutterPrintPlugin
     if (isImage(filePath)) {
       printImage(file, options, result);
     } else {
-      watchJob(printPdf(file, options), result);
+      PrintJob job = printPdf(file, options);
+      long id = job.getId();
+      trackedJobs.put(id, new TrackedPrintJob("", file.getName(), job));
+      watchJob(job, result);
     }
   }
 

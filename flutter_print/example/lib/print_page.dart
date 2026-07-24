@@ -7,6 +7,7 @@ import 'package:flutter_print/flutter_print.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'blob/blob_url.dart';
+import 'print_log.dart';
 import 'widgets.dart';
 
 enum _Source { pdf, image, text, docx, widget }
@@ -111,6 +112,13 @@ class _PrintPageState extends State<PrintPage> {
           );
         }
       });
+      logPrintExample('list_printers', 'count=${printers.length}');
+      for (final p in printers) {
+        logPrintExample(
+          'printer',
+          'label="${p.label}" address="${p.address}" default=${p.isDefault}',
+        );
+      }
       _show('Found ${printers.length} printer(s)');
     } on PlatformException catch (e) {
       _showError(e.message ?? 'listPrinters failed');
@@ -168,6 +176,52 @@ class _PrintPageState extends State<PrintPage> {
     }
   }
 
+  Future<void> _listPrintJobs() async {
+    final address = _selectedPrinter?.address;
+    if (address == null || address.isEmpty) {
+      _showError('Select a target printer to list jobs');
+      return;
+    }
+    setState(() => _loadingPrinters = true);
+    try {
+      final jobs = await FlutterPrint.listPrintJobs(address);
+      logPrintJobsListed(address, jobs);
+      _show('Queue: ${jobs.length} job(s) — see console logs');
+    } on PlatformException catch (e) {
+      logPrintExample('list_print_jobs_error', e.message);
+      _showError(e.message ?? 'listPrintJobs failed');
+    } finally {
+      setState(() => _loadingPrinters = false);
+    }
+  }
+
+  Future<void> _printWithStatusStream(String path) async {
+    logPrintExample(
+      'print_with_status_start',
+      'path="$path" printer="${_selectedPrinter?.address ?? "default"}"',
+    );
+    PrintJobStatus? lastStatus;
+    try {
+      await for (final job
+          in FlutterPrint.printWithStatus(path, options: _options)) {
+        logPrintJobUpdate(job);
+        lastStatus = job.parsedStatus;
+        if (mounted) {
+          _show(
+            'Job ${job.id}: ${job.parsedStatus.name} (raw ${job.rawStatus})',
+          );
+        }
+      }
+      logPrintExample(
+        'print_with_status_done',
+        lastStatus?.name ?? 'no_events',
+      );
+    } catch (e, st) {
+      logPrintExampleError(e, st);
+      rethrow;
+    }
+  }
+
   Future<void> _doPrint(
     BuildContext context, {
     required bool directPrint,
@@ -189,36 +243,49 @@ class _PrintPageState extends State<PrintPage> {
         );
         final size = PageSize(name: 'Business Card', width: 85.6, height: 54.0);
         if (directPrint) {
+          logPrintExample('print_widget', 'direct (no status stream)');
           await FlutterPrint.printWidget(
             builder,
             context: context,
             options: _options,
             contentSize: size,
           );
+          _show('Job submitted');
         } else {
+          logPrintExample('print_widget_preview', 'dialog (no status stream)');
           await FlutterPrint.printWidgetPreview(
             builder,
             context: context,
             options: _options,
             contentSize: size,
           );
+          _show('Dialog closed');
         }
       } else {
         final path = await _resolveFilePath();
         if (directPrint) {
-          await FlutterPrint.print(path, options: _options);
+          await _printWithStatusStream(path);
+          _show('Print stream finished — see console logs');
         } else {
+          logPrintExample(
+            'print_preview',
+            'status stream not used (native dialog)',
+          );
           if (!context.mounted) return;
           await FlutterPrint.printPreview(
             path,
             options: _options,
             context: context,
           );
+          _show('Dialog closed');
         }
       }
-      _show(directPrint ? 'Job submitted' : 'Dialog closed');
     } on PlatformException catch (e) {
+      logPrintExample('print_error', e.message);
       _showError(e.message ?? 'print failed');
+    } on StateError catch (e) {
+      logPrintExample('print_error', e.message);
+      _showError(e.message);
     } finally {
       setState(() => _busy = false);
     }
@@ -376,6 +443,13 @@ class _PrintPageState extends State<PrintPage> {
                                 ),
                               )
                             : const Text('List printers'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: _loadingPrinters ? null : _listPrintJobs,
+                        child: const Text('List jobs'),
                       ),
                     ),
                     if (FlutterPrint.ios != null) ...[

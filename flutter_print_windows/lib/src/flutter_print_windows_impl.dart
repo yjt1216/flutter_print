@@ -26,4 +26,16 @@ class FlutterPrintWindowsImpl extends FlutterPrintPlatform {
 
   @override
   Future<PrinterInfo?> pickPrinter() => _api.pickPrinter();
+
+  @override
+  Future<List<PrintJobInfo>> listPrintJobs(String printerAddress) =>
+      _api.listPrintJobs(printerAddress);
+
+  @override
+  Future<int> printSubmit(String filePath, {PrintOptions? options}) =>
+      _api.printSubmit(filePath, options: options);
+
+  @override
+  Future<void> cancelPrintJob(String printerAddress, int jobId) =>
+      _api.cancelPrintJob(printerAddress, jobId);
 }

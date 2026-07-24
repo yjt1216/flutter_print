@@ -1,6 +1,7 @@
 #define NOMINMAX  // must precede flutter_print_plugin.h's <windows.h>
 #include "flutter_print_plugin.h"
 #include "flutter_print_utils.h"
+#include "print_jobs.h"
 #include "printer_setup.h"
 #include "document_renderer.h"
 
@@ -82,7 +83,11 @@ void FlutterPrintPlugin::Print(
 }
 
 std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
-    const std::string& file_path, const PrintOptions* options) {
+    const std::string& file_path, const PrintOptions* options,
+    int* out_job_id) {
+  if (out_job_id) {
+    *out_job_id = -1;
+  }
   const std::wstring wPath = Utf8ToWide(file_path);
   if (GetFileAttributesW(wPath.c_str()) == INVALID_FILE_ATTRIBUTES)
     return FlutterError("FILE_NOT_FOUND", "File not found: " + file_path);
@@ -111,7 +116,15 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
       return FlutterError("PRINTER_ERROR",
                           "Cannot create printer DC for: " +
                               WideToUtf8(wPrinter.c_str()));
-    return RenderOrFallback(hdc, wPath, mime, wPrinter, softwareCopies);
+    auto err = RenderOrFallback(hdc, wPath, mime, wPrinter, softwareCopies);
+    if (!err.has_value() && out_job_id) {
+      for (const auto& entry : ListPrintJobsForPrinter(wPrinter)) {
+        if (entry.id > *out_job_id) {
+          *out_job_id = entry.id;
+        }
+      }
+    }
+    return err;
   }
 
   // Other file types: delegate to the file's associated application.
@@ -297,6 +310,74 @@ void FlutterPrintPlugin::ListPrinters(
           caps, &avail)));
     }
     reply(std::move(printers));
+  }).detach();
+}
+
+namespace {
+
+flutter::EncodableList JobsToEncodable(const std::vector<JobEntry>& jobs) {
+  flutter::EncodableList list;
+  list.reserve(jobs.size());
+  for (const auto& j : jobs) {
+    list.push_back(flutter::CustomEncodableValue(PrintJobInfo(
+        static_cast<int64_t>(j.id), j.title,
+        static_cast<int64_t>(j.raw_status))));
+  }
+  return list;
+}
+
+}  // namespace
+
+void FlutterPrintPlugin::ListPrintJobs(
+    const std::string& printer_address,
+    std::function<void(ErrorOr<flutter::EncodableList> reply)> result) {
+  std::thread([printer_address, result = std::move(result), alive = alive_]() {
+    const std::wstring wPrinter = Utf8ToWide(printer_address);
+    flutter::EncodableList list = JobsToEncodable(ListPrintJobsForPrinter(wPrinter));
+    if (alive->load()) {
+      result(std::move(list));
+    }
+  }).detach();
+}
+
+void FlutterPrintPlugin::PrintSubmit(
+    const std::string& file_path, const PrintOptions* options,
+    std::function<void(ErrorOr<int64_t> reply)> result) {
+  std::optional<PrintOptions> optionsCopy;
+  if (options) {
+    optionsCopy = *options;
+  }
+  std::thread([this, file_path, optionsCopy = std::move(optionsCopy),
+               result = std::move(result), alive = alive_]() mutable {
+    int job_id = -1;
+    auto err = PrintInternal(
+        file_path, optionsCopy ? &*optionsCopy : nullptr, &job_id);
+    if (!alive->load()) {
+      return;
+    }
+    if (err.has_value()) {
+      result(err.value());
+    } else {
+      result(static_cast<int64_t>(job_id));
+    }
+  }).detach();
+}
+
+void FlutterPrintPlugin::CancelPrintJob(
+    const std::string& printer_address, int64_t job_id,
+    std::function<void(std::optional<FlutterError> reply)> result) {
+  std::thread([printer_address, job_id, result = std::move(result),
+               alive = alive_]() {
+    const std::wstring wPrinter = Utf8ToWide(printer_address);
+    if (!CancelPrintJobOnPrinter(wPrinter, static_cast<int>(job_id))) {
+      if (alive->load()) {
+        result(FlutterError("PRINT_ERROR", "Failed to cancel print job"));
+      }
+      return;
+    }
+    if (alive->load()) {
+      result(std::nullopt);
+    }
   }).detach();
 }
 

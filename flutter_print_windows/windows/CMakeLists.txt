@@ -25,6 +25,8 @@ list(APPEND PLUGIN_SOURCES
   "printer_setup.h"
   "document_renderer.cpp"
   "document_renderer.h"
+  "print_jobs.cpp"
+  "print_jobs.h"
   "messages.cpp"
   "messages.h"
 )

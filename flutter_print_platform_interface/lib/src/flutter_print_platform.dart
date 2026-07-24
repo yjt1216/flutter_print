@@ -4,6 +4,18 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'flutter_print_method_channel.dart';
 import 'messages.g.dart';
 
+export 'messages.g.dart'
+    show
+        ColorCapability,
+        DuplexMode,
+        FlutterPrintApi,
+        PageMargins,
+        PageSize,
+        PrintJobInfo,
+        PrinterCapabilities,
+        PrinterInfo,
+        PrintOptions;
+
 abstract class FlutterPrintPlatform extends PlatformInterface {
   FlutterPrintPlatform() : super(token: _token);
 
@@ -48,5 +60,17 @@ abstract class FlutterPrintPlatform extends PlatformInterface {
   /// Shows a native printer-picker UI (iOS only).
   Future<PrinterInfo?> pickPrinter() {
     throw UnimplementedError('pickPrinter() has not been implemented.');
+  }
+
+  Future<List<PrintJobInfo>> listPrintJobs(String printerAddress) {
+    throw UnimplementedError('listPrintJobs() has not been implemented.');
+  }
+
+  Future<int> printSubmit(String filePath, {PrintOptions? options}) {
+    throw UnimplementedError('printSubmit() has not been implemented.');
+  }
+
+  Future<void> cancelPrintJob(String printerAddress, int jobId) {
+    throw UnimplementedError('cancelPrintJob() has not been implemented.');
   }
 }

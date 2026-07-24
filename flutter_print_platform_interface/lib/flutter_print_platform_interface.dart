@@ -8,4 +8,5 @@ export 'src/messages.g.dart'
         PageSize,
         PrinterCapabilities,
         PrinterInfo,
-        PrintOptions;
+        PrintOptions,
+        PrintJobInfo;

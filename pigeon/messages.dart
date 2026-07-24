@@ -239,6 +239,26 @@ class PrinterInfo {
   final bool? isAvailable;
 }
 
+/// A print job in the system queue (Windows Spooler / CUPS / Android PrintJob).
+///
+/// [rawStatus] is platform-specific. Parse with [PrintJobStatusHelper] in Dart.
+class PrintJobInfo {
+  const PrintJobInfo({
+    required this.id,
+    required this.title,
+    required this.rawStatus,
+  });
+
+  /// Platform job identifier.
+  final int id;
+
+  /// Document / job title from the spooler.
+  final String title;
+
+  /// Raw status from the OS (Windows `JOB_STATUS_*` bits, CUPS IPP state, etc.).
+  final int rawStatus;
+}
+
 // ---------------------------------------------------------------------------
 // Host API — implemented natively, called from Dart
 // ---------------------------------------------------------------------------
@@ -305,4 +325,25 @@ abstract class FlutterPrintApi {
   /// Returns `null` on all other platforms.
   @async
   PrinterInfo? pickPrinter();
+
+  /// Lists jobs in the queue for [printerAddress] (printer name or CUPS name).
+  ///
+  /// **Android** — tracked jobs started by this app via [printSubmit].
+  /// **iOS / Web** — empty list.
+  @async
+  List<PrintJobInfo> listPrintJobs(String printerAddress);
+
+  /// Submits [filePath] for printing and returns a spooler job id when available.
+  ///
+  /// Returns `-1` when the platform cannot track the job (silent paths without
+  /// a queue id). Throws on error.
+  ///
+  /// **Android / iOS** — opens the system print UI for PDF; job id is assigned
+  /// when the user confirms (same as [print] for images with immediate id).
+  @async
+  int printSubmit(String filePath, {PrintOptions? options});
+
+  /// Cancels a queued job. Unsupported platforms throw [PlatformException].
+  @async
+  void cancelPrintJob(String printerAddress, int jobId);
 }

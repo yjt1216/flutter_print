@@ -22,4 +22,16 @@ class MethodChannelFlutterPrint extends FlutterPrintPlatform {
 
   @override
   Future<PrinterInfo?> pickPrinter() => api.pickPrinter();
+
+  @override
+  Future<List<PrintJobInfo>> listPrintJobs(String printerAddress) =>
+      api.listPrintJobs(printerAddress);
+
+  @override
+  Future<int> printSubmit(String filePath, {PrintOptions? options}) =>
+      api.printSubmit(filePath, options: options);
+
+  @override
+  Future<void> cancelPrintJob(String printerAddress, int jobId) =>
+      api.cancelPrintJob(printerAddress, jobId);
 }

@@ -35,6 +35,15 @@ class FlutterPrintPlugin : public flutter::Plugin, public FlutterPrintApi {
       std::function<void(ErrorOr<std::optional<PrinterInfo>>)> result) override;
   void ListPrinters(
       std::function<void(ErrorOr<flutter::EncodableList>)> result) override;
+  void ListPrintJobs(
+      const std::string& printer_address,
+      std::function<void(ErrorOr<flutter::EncodableList> reply)> result) override;
+  void PrintSubmit(
+      const std::string& file_path, const PrintOptions* options,
+      std::function<void(ErrorOr<int64_t> reply)> result) override;
+  void CancelPrintJob(
+      const std::string& printer_address, int64_t job_id,
+      std::function<void(std::optional<FlutterError> reply)> result) override;
 
   // Windows-specific extras: PDF preview rendering for the Flutter print dialog.
   void HandleWindowsMethod(
@@ -45,7 +54,8 @@ class FlutterPrintPlugin : public flutter::Plugin, public FlutterPrintApi {
   // Synchronous core of Print(); the public override forwards its result to the
   // Pigeon completion callback.
   std::optional<FlutterError> PrintInternal(const std::string& file_path,
-                                            const PrintOptions* options);
+                                            const PrintOptions* options,
+                                            int* out_job_id = nullptr);
 
   using WinResult =
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>;

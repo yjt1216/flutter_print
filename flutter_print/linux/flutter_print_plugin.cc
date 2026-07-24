@@ -408,14 +408,171 @@ static void handle_list_printers(
 }
 
 // ---------------------------------------------------------------------------
+// Print jobs (list / submit / cancel)
+// ---------------------------------------------------------------------------
+
+static void append_print_job_info(FlValue* list, int64_t id, const gchar* title,
+                                  int64_t raw_status) {
+  g_autoptr(FlutterPrintPrintJobInfo) info =
+      flutter_print_print_job_info_new(id, title, raw_status);
+  fl_value_append_take(
+      list,
+      fl_value_new_custom_object(flutter_print_print_job_info_type_id,
+                                 G_OBJECT(info)));
+}
+
+static void handle_list_print_jobs(
+    const gchar* printer_address,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+  FlValue* list = fl_value_new_list();
+#ifdef HAS_CUPS
+  const char* dest = (printer_address && printer_address[0] != '\0')
+                         ? printer_address
+                         : cupsGetDefault();
+  if (!dest) {
+    flutter_print_flutter_print_api_respond_list_print_jobs(response_handle,
+                                                            list);
+    fl_value_unref(list);
+    return;
+  }
+  int num_jobs = 0;
+  cups_job_t* jobs = cupsGetJobs(&num_jobs, dest, 0, CUPS_WHICHJOBS_ALL);
+  for (int i = 0; i < num_jobs; i++) {
+    const char* title =
+        jobs[i].title && jobs[i].title[0] != '\0' ? jobs[i].title : "Print job";
+    append_print_job_info(list, jobs[i].id, title, jobs[i].state);
+  }
+  cupsFreeJobs(num_jobs, jobs);
+#endif
+  flutter_print_flutter_print_api_respond_list_print_jobs(response_handle, list);
+  fl_value_unref(list);
+}
+
+static void handle_print_submit(
+    const gchar* file_path,
+    FlutterPrintPrintOptions* options,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+  if (!g_file_test(file_path, G_FILE_TEST_EXISTS)) {
+    g_autofree gchar* msg = g_strdup_printf("File not found: %s", file_path);
+    flutter_print_flutter_print_api_respond_error_print_submit(
+        response_handle, "FILE_NOT_FOUND", msg, nullptr);
+    return;
+  }
+
+#ifdef HAS_CUPS
+  const gchar* printer_address =
+      options ? flutter_print_print_options_get_printer_address(options) : nullptr;
+  const gchar* dest = (printer_address && printer_address[0] != '\0')
+                          ? printer_address
+                          : cupsGetDefault();
+
+  int num_options = 0;
+  cups_option_t* cups_opts = nullptr;
+
+  const int64_t* copies =
+      options ? flutter_print_print_options_get_copies(options) : nullptr;
+  if (copies && *copies > 1) {
+    gchar* s = g_strdup_printf("%" G_GINT64_FORMAT, *copies);
+    num_options = cupsAddOption("copies", s, num_options, &cups_opts);
+    g_free(s);
+  }
+
+  const gboolean* landscape =
+      options ? flutter_print_print_options_get_landscape(options) : nullptr;
+  if (landscape && *landscape) {
+    num_options = cupsAddOption("orientation-requested", "4", num_options,
+                                &cups_opts);
+  }
+
+  const gboolean* color =
+      options ? flutter_print_print_options_get_color(options) : nullptr;
+  if (color && !*color) {
+    num_options = cupsAddOption("print-color-mode", "monochrome", num_options,
+                                &cups_opts);
+  }
+
+  FlutterPrintDuplexMode* duplex_mode =
+      options ? flutter_print_print_options_get_duplex_mode(options) : nullptr;
+  if (duplex_mode) {
+    const char* sides = nullptr;
+    switch (*duplex_mode) {
+      case FLUTTER_PRINT_PLATFORM_INTERFACE_DUPLEX_MODE_NONE:
+        sides = "one-sided";
+        break;
+      case FLUTTER_PRINT_PLATFORM_INTERFACE_DUPLEX_MODE_LONG_EDGE:
+        sides = "two-sided-long-edge";
+        break;
+      case FLUTTER_PRINT_PLATFORM_INTERFACE_DUPLEX_MODE_SHORT_EDGE:
+        sides = "two-sided-short-edge";
+        break;
+    }
+    if (sides)
+      num_options = cupsAddOption("sides", sides, num_options, &cups_opts);
+  }
+
+  gchar* transcoded = needs_transcode(file_path)
+                          ? transcode_to_png(file_path)
+                          : nullptr;
+  const char* print_path = transcoded ? transcoded : file_path;
+
+  int job_id = cupsPrintFile(dest, print_path, "Flutter Print Job", num_options,
+                             cups_opts);
+  cupsFreeOptions(num_options, cups_opts);
+
+  if (transcoded) {
+    g_remove(transcoded);
+    g_free(transcoded);
+  }
+
+  if (job_id == 0) {
+    flutter_print_flutter_print_api_respond_error_print_submit(
+        response_handle, "PRINT_ERROR", cupsLastErrorString(), nullptr);
+    return;
+  }
+
+  flutter_print_flutter_print_api_respond_print_submit(response_handle, job_id);
+#else
+  flutter_print_flutter_print_api_respond_print_submit(response_handle, -1);
+#endif
+}
+
+static void handle_cancel_print_job(
+    const gchar* printer_address,
+    int64_t job_id,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+#ifdef HAS_CUPS
+  const char* dest = (printer_address && printer_address[0] != '\0')
+                         ? printer_address
+                         : cupsGetDefault();
+  ipp_status_t status = cupsCancelJob(dest, (int)job_id);
+  if (status > IPP_STATUS_OK_EVENTS_COMPLETE) {
+    flutter_print_flutter_print_api_respond_error_cancel_print_job(
+        response_handle, "CANCEL_FAILED", cupsLastErrorString(), nullptr);
+    return;
+  }
+  flutter_print_flutter_print_api_respond_cancel_print_job(response_handle);
+#else
+  flutter_print_flutter_print_api_respond_error_cancel_print_job(
+      response_handle, "UNSUPPORTED",
+      "cancelPrintJob requires CUPS at build time", nullptr);
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // Plugin registration
 // ---------------------------------------------------------------------------
 
 static const FlutterPrintFlutterPrintApiVTable kApiVTable = {
-    .print         = handle_print,
-    .print_preview = handle_print_preview,
-    .list_printers = handle_list_printers,
-    .pick_printer  = handle_pick_printer,
+    .print             = handle_print,
+    .print_preview     = handle_print_preview,
+    .list_printers     = handle_list_printers,
+    .pick_printer      = handle_pick_printer,
+    .list_print_jobs   = handle_list_print_jobs,
+    .print_submit      = handle_print_submit,
+    .cancel_print_job  = handle_cancel_print_job,
 };
 
 void flutter_print_plugin_register_with_registrar(

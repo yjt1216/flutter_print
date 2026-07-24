@@ -4,6 +4,7 @@ import 'package:flutter_print_platform_interface/flutter_print_platform_interfac
 
 import 'bytes_helper/bytes_helper.dart';
 import 'document_renderer.dart';
+import 'print_job_monitor.dart' as job_monitor;
 
 class FlutterPrint {
   FlutterPrint._();
@@ -145,6 +146,47 @@ class FlutterPrint {
   /// (Android, iOS, Web).
   static Future<List<PrinterInfo>> listPrinters() {
     return FlutterPrintPlatform.instance.listPrinters();
+  }
+
+  /// Lists spooler jobs for [printerAddress] (queue name on desktop).
+  static Future<List<PrintJobInfo>> listPrintJobs(String printerAddress) {
+    return FlutterPrintPlatform.instance.listPrintJobs(printerAddress);
+  }
+
+  /// Submits [filePath] and returns a trackable job id, or `-1` if unavailable.
+  static Future<int> printSubmit(String filePath, {PrintOptions? options}) {
+    return FlutterPrintPlatform.instance.printSubmit(filePath, options: options);
+  }
+
+  /// Polls the spooler until [jobId] reaches a terminal state.
+  static Stream<PrintJobInfo> watchPrintJob(
+    String printerAddress,
+    int jobId, {
+    Duration pollInterval = const Duration(seconds: 2),
+  }) {
+    return job_monitor.watchPrintJob(
+      printerAddress,
+      jobId,
+      pollInterval: pollInterval,
+    );
+  }
+
+  /// Prints [filePath] and emits spooler status updates until completion.
+  static Stream<PrintJobInfo> printWithStatus(
+    String filePath, {
+    PrintOptions? options,
+    Duration pollInterval = const Duration(seconds: 2),
+  }) {
+    return job_monitor.printWithStatus(
+      filePath,
+      options: options,
+      pollInterval: pollInterval,
+    );
+  }
+
+  /// Cancels a queued job when the platform supports it.
+  static Future<void> cancelPrintJob(String printerAddress, int jobId) {
+    return FlutterPrintPlatform.instance.cancelPrintJob(printerAddress, jobId);
   }
 
   /// iOS-specific extensions. Returns `null` on all other platforms.
