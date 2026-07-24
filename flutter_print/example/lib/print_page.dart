@@ -36,6 +36,7 @@ class _PrintPageState extends State<PrintPage> {
   _Source _source = _Source.pdf;
 
   // --- print options
+  final _documentTitleController = TextEditingController();
   int _paperSizeIndex = 1; // A4
   int _copies = 1;
   bool _landscape = false;
@@ -88,14 +89,24 @@ class _PrintPageState extends State<PrintPage> {
     return file.path;
   }
 
-  PrintOptions get _options => PrintOptions(
-    printerAddress: _selectedPrinter?.address,
-    pageSize: _paperSizes[_paperSizeIndex],
-    copies: _copies,
-    landscape: _source == _Source.widget ? false : _landscape,
-    color: _color,
-    duplexMode: _source == _Source.widget ? null : _duplexMode,
-  );
+  PrintOptions get _options {
+    final title = _documentTitleController.text.trim();
+    return PrintOptions(
+      printerAddress: _selectedPrinter?.address,
+      documentTitle: title.isEmpty ? null : title,
+      pageSize: _paperSizes[_paperSizeIndex],
+      copies: _copies,
+      landscape: _source == _Source.widget ? false : _landscape,
+      color: _color,
+      duplexMode: _source == _Source.widget ? null : _duplexMode,
+    );
+  }
+
+  @override
+  void dispose() {
+    _documentTitleController.dispose();
+    super.dispose();
+  }
 
   // ---------------------------------------------------------------------------
 
@@ -144,6 +155,7 @@ class _PrintPageState extends State<PrintPage> {
     }
   }
 
+  // 预览打印
   Future<void> _doPreview() async {
     if (_busy) return;
     setState(() {
@@ -176,6 +188,7 @@ class _PrintPageState extends State<PrintPage> {
     }
   }
 
+  // 列出打印作业
   Future<void> _listPrintJobs() async {
     final address = _selectedPrinter?.address;
     if (address == null || address.isEmpty) {
@@ -195,10 +208,13 @@ class _PrintPageState extends State<PrintPage> {
     }
   }
 
+  // 打印作业状态流
   Future<void> _printWithStatusStream(String path) async {
+    final docTitle = _options.documentTitle;
     logPrintExample(
       'print_with_status_start',
-      'path="$path" printer="${_selectedPrinter?.address ?? "default"}"',
+      'path="$path" printer="${_selectedPrinter?.address ?? "default"}" '
+      'documentTitle=${docTitle == null ? "null" : '"$docTitle"'}',
     );
     PrintJobStatus? lastStatus;
     try {
@@ -222,6 +238,7 @@ class _PrintPageState extends State<PrintPage> {
     }
   }
 
+  // 打印
   Future<void> _doPrint(
     BuildContext context, {
     required bool directPrint,
@@ -345,6 +362,17 @@ class _PrintPageState extends State<PrintPage> {
             title: 'Print options',
             child: Column(
               children: [
+                TextField(
+                  controller: _documentTitleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Document title',
+                    hintText: 'Queue name, e.g. 检测报告 (empty = file name)',
+                    border: OutlineInputBorder(),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   decoration: const InputDecoration(labelText: 'Paper size'),
                   initialValue: _paperSizeIndex,
