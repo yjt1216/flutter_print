@@ -196,6 +196,7 @@ class PrintOptions {
   // Constructs an object setting all fields.
   explicit PrintOptions(
     const std::string* printer_address,
+    const std::string* document_title,
     const PageSize* page_size,
     const PageMargins* margins,
     const int64_t* copies,
@@ -219,6 +220,12 @@ class PrintOptions {
   const std::string* printer_address() const;
   void set_printer_address(const std::string_view* value_arg);
   void set_printer_address(std::string_view value_arg);
+
+  // Title shown in the print queue (Windows spooler document name, CUPS job
+  // title). When `null`, platforms use the file name.
+  const std::string* document_title() const;
+  void set_document_title(const std::string_view* value_arg);
+  void set_document_title(std::string_view value_arg);
 
   // Desired output page size.
   //
@@ -278,6 +285,7 @@ class PrintOptions {
   friend class FlutterPrintApi;
   friend class PigeonInternalCodecSerializer;
   std::optional<std::string> printer_address_;
+  std::optional<std::string> document_title_;
   std::unique_ptr<PageSize> page_size_;
   std::unique_ptr<PageMargins> margins_;
   std::optional<int64_t> copies_;
@@ -348,6 +356,13 @@ class PrinterCapabilities {
 
 // Describes a single printer returned by [FlutterPrintApi.listPrinters].
 //
+// Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+// metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+// the physical device or driver when building a **printer profile** (e.g.
+// which fault-handling rules apply). They do not replace vendor SDK status
+// codes — combine with [printerStatus], [isAvailable], and print-job status
+// streams from the main `flutter_print` package.
+//
 // Generated class from Pigeon that represents data sent in messages.
 class PrinterInfo {
  public:
@@ -364,7 +379,13 @@ class PrinterInfo {
     const std::string* details,
     bool is_default,
     const PrinterCapabilities& capabilities,
-    const bool* is_available);
+    const bool* is_available,
+    const int64_t* printer_status,
+    const std::string* driver_name,
+    const std::string* port_name,
+    const std::string* location,
+    const std::string* make_and_model,
+    const std::string* device_uri);
 
   ~PrinterInfo() = default;
   PrinterInfo(const PrinterInfo& other);
@@ -387,8 +408,12 @@ class PrinterInfo {
   void set_address(const std::string_view* value_arg);
   void set_address(std::string_view value_arg);
 
-  // Optional longer description provided by the platform (e.g. the printer
-  // model or location). May be `null`.
+  // Optional extra text from the platform. Meaning varies by OS:
+  //
+  // - **Windows** — driver comment (`pComment`), not the same as [location].
+  // - **Linux (CUPS)** — often `printer-location` when set.
+  //
+  // Prefer [makeAndModel] on CUPS for model identification. May be `null`.
   const std::string* details() const;
   void set_details(const std::string_view* value_arg);
   void set_details(std::string_view value_arg);
@@ -413,6 +438,74 @@ class PrinterInfo {
   void set_is_available(const bool* value_arg);
   void set_is_available(bool value_arg);
 
+  // Raw printer status from the spooler when the platform exposes it.
+  //
+  // **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+  // helpers exported from the `flutter_print` package (`describePrinterStatus`,
+  // `isBlockingOsPrinterStatus`, or `printWithStatus` with
+  // `watchPrinterStatus: true`).
+  //
+  // **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+  //
+  // Not the same as per-job status — see [PrintJobInfo.rawStatus].
+  const int64_t* printer_status() const;
+  void set_printer_status(const int64_t* value_arg);
+  void set_printer_status(int64_t value_arg);
+
+  // Installed print driver name (Windows queue properties → Driver).
+  //
+  // Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+  // driver for the same device) or to key a driver-based printer profile.
+  //
+  // **Platform:** Windows only; `null` elsewhere.
+  const std::string* driver_name() const;
+  void set_driver_name(const std::string_view* value_arg);
+  void set_driver_name(std::string_view value_arg);
+
+  // Port the queue is bound to (Windows `pPortName`).
+  //
+  // Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+  // Helps infer **connection type** (USB vs network vs virtual sink).
+  //
+  // **Platform:** Windows only; `null` elsewhere.
+  const std::string* port_name() const;
+  void set_port_name(const std::string_view* value_arg);
+  void set_port_name(std::string_view value_arg);
+
+  // User-visible location string (Windows `pLocation`), e.g. room or site.
+  //
+  // Distinct from [details] on Windows (comment field). On Linux, location
+  // may appear in [details] instead; [location] stays `null`.
+  //
+  // **Platform:** Windows only; `null` elsewhere.
+  const std::string* location() const;
+  void set_location(const std::string_view* value_arg);
+  void set_location(std::string_view value_arg);
+
+  // Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+  // e.g. `KONICA MINOLTA bizhub C458`.
+  //
+  // Primary field for **model-based printer profiles** on Linux. On Windows,
+  // [label] often already contains the model; use [driverName] as a secondary
+  // key.
+  //
+  // **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+  // added later.
+  const std::string* make_and_model() const;
+  void set_make_and_model(const std::string_view* value_arg);
+  void set_make_and_model(std::string_view value_arg);
+
+  // Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+  // `usb://Vendor/Model?serial=…`, `socket://…`.
+  //
+  // Useful for debugging connectivity and telling IPP/USB/network backends
+  // apart; not required for normal printing ([address] is the queue name).
+  //
+  // **Platform:** Linux (CUPS); `null` elsewhere.
+  const std::string* device_uri() const;
+  void set_device_uri(const std::string_view* value_arg);
+  void set_device_uri(std::string_view value_arg);
+
   bool operator==(const PrinterInfo& other) const;
   bool operator!=(const PrinterInfo& other) const;
   /// Returns a hash code value for the object. This method is supported for the benefit of hash tables.
@@ -430,6 +523,12 @@ class PrinterInfo {
   bool is_default_;
   std::unique_ptr<PrinterCapabilities> capabilities_;
   std::optional<bool> is_available_;
+  std::optional<int64_t> printer_status_;
+  std::optional<std::string> driver_name_;
+  std::optional<std::string> port_name_;
+  std::optional<std::string> location_;
+  std::optional<std::string> make_and_model_;
+  std::optional<std::string> device_uri_;
 };
 
 
@@ -576,11 +675,21 @@ class FlutterPrintApi {
     const std::string& file_path,
     const PrintOptions* options,
     std::function<void(ErrorOr<int64_t> reply)> result) = 0;
-  // Cancels a queued job. Unsupported platforms throw [PlatformException].
+  // Cancels a queued job. Returns `false` when the OS rejects the operation.
   virtual void CancelPrintJob(
     const std::string& printer_address,
     int64_t job_id,
-    std::function<void(std::optional<FlutterError> reply)> result) = 0;
+    std::function<void(ErrorOr<bool> reply)> result) = 0;
+  // Pauses a queued job. Returns `false` when unsupported or rejected.
+  virtual void PausePrintJob(
+    const std::string& printer_address,
+    int64_t job_id,
+    std::function<void(ErrorOr<bool> reply)> result) = 0;
+  // Resumes a paused job. Returns `false` when unsupported or rejected.
+  virtual void ResumePrintJob(
+    const std::string& printer_address,
+    int64_t job_id,
+    std::function<void(ErrorOr<bool> reply)> result) = 0;
 
   // The codec used by FlutterPrintApi.
   static const ::flutter::StandardMessageCodec& GetCodec();

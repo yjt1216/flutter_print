@@ -17,6 +17,29 @@ Package documentation and API usage live in **[flutter_print/README.md](./flutte
 
 Examples: `flutter_print/example`, and per-package `example/` folders where present.
 
+### Print job status (usage)
+
+The main plugin exposes **`FlutterPrint.printWithStatus`**, **`watchPrintJob`**,
+**`listPrintJobs`**, **`printSubmit`**, and **`cancelPrintJob`** for spooler
+tracking on desktop (Windows spooler, Linux CUPS) and tracked jobs on Android.
+Full API notes and platform matrix:
+**[flutter_print/README.md](./flutter_print/README.md#print-job-status)**.
+
+Quick start (Windows / Linux with a known queue name):
+
+```dart
+await for (final job in FlutterPrint.printWithStatus(
+  filePath,
+  options: PrintOptions(printerAddress: printerQueueName),
+)) {
+  print('${job.id} ${job.parsedStatus}');
+}
+```
+
+Try it in **`flutter_print/example`**: list printers, pick a queue, use
+**Print — direct** or **List jobs**; console lines are tagged
+`[flutter_print_example]`.
+
 ## Requirements
 
 - **Dart** `^3.12.0`

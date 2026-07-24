@@ -559,6 +559,7 @@ struct _FlutterPrintPrintOptions {
   GObject parent_instance;
 
   gchar* printer_address;
+  gchar* document_title;
   FlutterPrintPageSize* page_size;
   FlutterPrintPageMargins* margins;
   int64_t* copies;
@@ -572,6 +573,7 @@ G_DEFINE_TYPE(FlutterPrintPrintOptions, flutter_print_print_options, G_TYPE_OBJE
 static void flutter_print_print_options_dispose(GObject* object) {
   FlutterPrintPrintOptions* self = FLUTTER_PRINT_PRINT_OPTIONS(object);
   g_clear_pointer(&self->printer_address, g_free);
+  g_clear_pointer(&self->document_title, g_free);
   g_clear_object(&self->page_size);
   g_clear_object(&self->margins);
   g_clear_pointer(&self->copies, g_free);
@@ -588,13 +590,19 @@ static void flutter_print_print_options_class_init(FlutterPrintPrintOptionsClass
   G_OBJECT_CLASS(klass)->dispose = flutter_print_print_options_dispose;
 }
 
-FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode) {
+FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, const gchar* document_title, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode) {
   FlutterPrintPrintOptions* self = FLUTTER_PRINT_PRINT_OPTIONS(g_object_new(flutter_print_print_options_get_type(), nullptr));
   if (printer_address != nullptr) {
     self->printer_address = g_strdup(printer_address);
   }
   else {
     self->printer_address = nullptr;
+  }
+  if (document_title != nullptr) {
+    self->document_title = g_strdup(document_title);
+  }
+  else {
+    self->document_title = nullptr;
   }
   if (page_size != nullptr) {
     self->page_size = FLUTTER_PRINT_PAGE_SIZE(g_object_ref(page_size));
@@ -644,6 +652,11 @@ const gchar* flutter_print_print_options_get_printer_address(FlutterPrintPrintOp
   return self->printer_address;
 }
 
+const gchar* flutter_print_print_options_get_document_title(FlutterPrintPrintOptions* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), nullptr);
+  return self->document_title;
+}
+
 FlutterPrintPageSize* flutter_print_print_options_get_page_size(FlutterPrintPrintOptions* self) {
   g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), nullptr);
   return self->page_size;
@@ -677,6 +690,7 @@ FlutterPrintDuplexMode* flutter_print_print_options_get_duplex_mode(FlutterPrint
 static FlValue* flutter_print_print_options_to_list(FlutterPrintPrintOptions* self) {
   FlValue* values = fl_value_new_list();
   fl_value_append_take(values, self->printer_address != nullptr ? fl_value_new_string(self->printer_address) : fl_value_new_null());
+  fl_value_append_take(values, self->document_title != nullptr ? fl_value_new_string(self->document_title) : fl_value_new_null());
   fl_value_append_take(values, self->page_size != nullptr ? fl_value_new_custom_object(flutter_print_page_size_type_id, G_OBJECT(self->page_size)) : fl_value_new_null());
   fl_value_append_take(values, self->margins != nullptr ? fl_value_new_custom_object(flutter_print_page_margins_type_id, G_OBJECT(self->margins)) : fl_value_new_null());
   fl_value_append_take(values, self->copies != nullptr ? fl_value_new_int(*self->copies) : fl_value_new_null());
@@ -693,44 +707,49 @@ static FlutterPrintPrintOptions* flutter_print_print_options_new_from_list(FlVal
     printer_address = fl_value_get_string(value0);
   }
   FlValue* value1 = fl_value_get_list_value(values, 1);
-  FlutterPrintPageSize* page_size = nullptr;
+  const gchar* document_title = nullptr;
   if (fl_value_get_type(value1) != FL_VALUE_TYPE_NULL) {
-    page_size = FLUTTER_PRINT_PAGE_SIZE(fl_value_get_custom_value_object(value1));
+    document_title = fl_value_get_string(value1);
   }
   FlValue* value2 = fl_value_get_list_value(values, 2);
-  FlutterPrintPageMargins* margins = nullptr;
+  FlutterPrintPageSize* page_size = nullptr;
   if (fl_value_get_type(value2) != FL_VALUE_TYPE_NULL) {
-    margins = FLUTTER_PRINT_PAGE_MARGINS(fl_value_get_custom_value_object(value2));
+    page_size = FLUTTER_PRINT_PAGE_SIZE(fl_value_get_custom_value_object(value2));
   }
   FlValue* value3 = fl_value_get_list_value(values, 3);
-  int64_t* copies = nullptr;
-  int64_t copies_value;
+  FlutterPrintPageMargins* margins = nullptr;
   if (fl_value_get_type(value3) != FL_VALUE_TYPE_NULL) {
-    copies_value = fl_value_get_int(value3);
-    copies = &copies_value;
+    margins = FLUTTER_PRINT_PAGE_MARGINS(fl_value_get_custom_value_object(value3));
   }
   FlValue* value4 = fl_value_get_list_value(values, 4);
-  gboolean* landscape = nullptr;
-  gboolean landscape_value;
+  int64_t* copies = nullptr;
+  int64_t copies_value;
   if (fl_value_get_type(value4) != FL_VALUE_TYPE_NULL) {
-    landscape_value = fl_value_get_bool(value4);
-    landscape = &landscape_value;
+    copies_value = fl_value_get_int(value4);
+    copies = &copies_value;
   }
   FlValue* value5 = fl_value_get_list_value(values, 5);
-  gboolean* color = nullptr;
-  gboolean color_value;
+  gboolean* landscape = nullptr;
+  gboolean landscape_value;
   if (fl_value_get_type(value5) != FL_VALUE_TYPE_NULL) {
-    color_value = fl_value_get_bool(value5);
-    color = &color_value;
+    landscape_value = fl_value_get_bool(value5);
+    landscape = &landscape_value;
   }
   FlValue* value6 = fl_value_get_list_value(values, 6);
+  gboolean* color = nullptr;
+  gboolean color_value;
+  if (fl_value_get_type(value6) != FL_VALUE_TYPE_NULL) {
+    color_value = fl_value_get_bool(value6);
+    color = &color_value;
+  }
+  FlValue* value7 = fl_value_get_list_value(values, 7);
   FlutterPrintDuplexMode* duplex_mode = nullptr;
   FlutterPrintDuplexMode duplex_mode_value;
-  if (fl_value_get_type(value6) != FL_VALUE_TYPE_NULL) {
-    duplex_mode_value = static_cast<FlutterPrintDuplexMode>(fl_value_get_int(reinterpret_cast<FlValue*>(const_cast<gpointer>(fl_value_get_custom_value(value6)))));
+  if (fl_value_get_type(value7) != FL_VALUE_TYPE_NULL) {
+    duplex_mode_value = static_cast<FlutterPrintDuplexMode>(fl_value_get_int(reinterpret_cast<FlValue*>(const_cast<gpointer>(fl_value_get_custom_value(value7)))));
     duplex_mode = &duplex_mode_value;
   }
-  return flutter_print_print_options_new(printer_address, page_size, margins, copies, landscape, color, duplex_mode);
+  return flutter_print_print_options_new(printer_address, document_title, page_size, margins, copies, landscape, color, duplex_mode);
 }
 
 gboolean flutter_print_print_options_equals(FlutterPrintPrintOptions* a, FlutterPrintPrintOptions* b) {
@@ -741,6 +760,9 @@ gboolean flutter_print_print_options_equals(FlutterPrintPrintOptions* a, Flutter
     return FALSE;
   }
   if (g_strcmp0(a->printer_address, b->printer_address) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->document_title, b->document_title) != 0) {
     return FALSE;
   }
   if (!flutter_print_page_size_equals(a->page_size, b->page_size)) {
@@ -780,6 +802,7 @@ guint flutter_print_print_options_hash(FlutterPrintPrintOptions* self) {
   g_return_val_if_fail(FLUTTER_PRINT_IS_PRINT_OPTIONS(self), 0);
   guint result = 0;
   result = result * 31 + (self->printer_address != nullptr ? g_str_hash(self->printer_address) : 0);
+  result = result * 31 + (self->document_title != nullptr ? g_str_hash(self->document_title) : 0);
   result = result * 31 + flutter_print_page_size_hash(self->page_size);
   result = result * 31 + flutter_print_page_margins_hash(self->margins);
   result = result * 31 + (self->copies != nullptr ? static_cast<guint>(*self->copies) : 0);
@@ -795,6 +818,13 @@ gchar* flutter_print_print_options_to_string(FlutterPrintPrintOptions* self) {
   g_string_append(str, "printer_address: ");
   if (self->printer_address != nullptr) {
     g_string_append_printf(str, "\"%s\"", self->printer_address);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", document_title: ");
+  if (self->document_title != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->document_title);
   }
   else {
     g_string_append(str, "null");
@@ -1026,6 +1056,12 @@ struct _FlutterPrintPrinterInfo {
   gboolean is_default;
   FlutterPrintPrinterCapabilities* capabilities;
   gboolean* is_available;
+  int64_t* printer_status;
+  gchar* driver_name;
+  gchar* port_name;
+  gchar* location;
+  gchar* make_and_model;
+  gchar* device_uri;
 };
 
 G_DEFINE_TYPE(FlutterPrintPrinterInfo, flutter_print_printer_info, G_TYPE_OBJECT)
@@ -1037,6 +1073,12 @@ static void flutter_print_printer_info_dispose(GObject* object) {
   g_clear_pointer(&self->details, g_free);
   g_clear_object(&self->capabilities);
   g_clear_pointer(&self->is_available, g_free);
+  g_clear_pointer(&self->printer_status, g_free);
+  g_clear_pointer(&self->driver_name, g_free);
+  g_clear_pointer(&self->port_name, g_free);
+  g_clear_pointer(&self->location, g_free);
+  g_clear_pointer(&self->make_and_model, g_free);
+  g_clear_pointer(&self->device_uri, g_free);
   G_OBJECT_CLASS(flutter_print_printer_info_parent_class)->dispose(object);
 }
 
@@ -1047,7 +1089,7 @@ static void flutter_print_printer_info_class_init(FlutterPrintPrinterInfoClass* 
   G_OBJECT_CLASS(klass)->dispose = flutter_print_printer_info_dispose;
 }
 
-FlutterPrintPrinterInfo* flutter_print_printer_info_new(const gchar* label, const gchar* address, const gchar* details, gboolean is_default, FlutterPrintPrinterCapabilities* capabilities, gboolean* is_available) {
+FlutterPrintPrinterInfo* flutter_print_printer_info_new(const gchar* label, const gchar* address, const gchar* details, gboolean is_default, FlutterPrintPrinterCapabilities* capabilities, gboolean* is_available, int64_t* printer_status, const gchar* driver_name, const gchar* port_name, const gchar* location, const gchar* make_and_model, const gchar* device_uri) {
   FlutterPrintPrinterInfo* self = FLUTTER_PRINT_PRINTER_INFO(g_object_new(flutter_print_printer_info_get_type(), nullptr));
   self->label = g_strdup(label);
   if (address != nullptr) {
@@ -1070,6 +1112,43 @@ FlutterPrintPrinterInfo* flutter_print_printer_info_new(const gchar* label, cons
   }
   else {
     self->is_available = nullptr;
+  }
+  if (printer_status != nullptr) {
+    self->printer_status = static_cast<int64_t*>(malloc(sizeof(int64_t)));
+    *self->printer_status = *printer_status;
+  }
+  else {
+    self->printer_status = nullptr;
+  }
+  if (driver_name != nullptr) {
+    self->driver_name = g_strdup(driver_name);
+  }
+  else {
+    self->driver_name = nullptr;
+  }
+  if (port_name != nullptr) {
+    self->port_name = g_strdup(port_name);
+  }
+  else {
+    self->port_name = nullptr;
+  }
+  if (location != nullptr) {
+    self->location = g_strdup(location);
+  }
+  else {
+    self->location = nullptr;
+  }
+  if (make_and_model != nullptr) {
+    self->make_and_model = g_strdup(make_and_model);
+  }
+  else {
+    self->make_and_model = nullptr;
+  }
+  if (device_uri != nullptr) {
+    self->device_uri = g_strdup(device_uri);
+  }
+  else {
+    self->device_uri = nullptr;
   }
   return self;
 }
@@ -1104,6 +1183,36 @@ gboolean* flutter_print_printer_info_get_is_available(FlutterPrintPrinterInfo* s
   return self->is_available;
 }
 
+int64_t* flutter_print_printer_info_get_printer_status(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->printer_status;
+}
+
+const gchar* flutter_print_printer_info_get_driver_name(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->driver_name;
+}
+
+const gchar* flutter_print_printer_info_get_port_name(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->port_name;
+}
+
+const gchar* flutter_print_printer_info_get_location(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->location;
+}
+
+const gchar* flutter_print_printer_info_get_make_and_model(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->make_and_model;
+}
+
+const gchar* flutter_print_printer_info_get_device_uri(FlutterPrintPrinterInfo* self) {
+  g_return_val_if_fail(FLUTTER_PRINT_IS_PRINTER_INFO(self), nullptr);
+  return self->device_uri;
+}
+
 static FlValue* flutter_print_printer_info_to_list(FlutterPrintPrinterInfo* self) {
   FlValue* values = fl_value_new_list();
   fl_value_append_take(values, fl_value_new_string(self->label));
@@ -1112,6 +1221,12 @@ static FlValue* flutter_print_printer_info_to_list(FlutterPrintPrinterInfo* self
   fl_value_append_take(values, fl_value_new_bool(self->is_default));
   fl_value_append_take(values, fl_value_new_custom_object(flutter_print_printer_capabilities_type_id, G_OBJECT(self->capabilities)));
   fl_value_append_take(values, self->is_available != nullptr ? fl_value_new_bool(*self->is_available) : fl_value_new_null());
+  fl_value_append_take(values, self->printer_status != nullptr ? fl_value_new_int(*self->printer_status) : fl_value_new_null());
+  fl_value_append_take(values, self->driver_name != nullptr ? fl_value_new_string(self->driver_name) : fl_value_new_null());
+  fl_value_append_take(values, self->port_name != nullptr ? fl_value_new_string(self->port_name) : fl_value_new_null());
+  fl_value_append_take(values, self->location != nullptr ? fl_value_new_string(self->location) : fl_value_new_null());
+  fl_value_append_take(values, self->make_and_model != nullptr ? fl_value_new_string(self->make_and_model) : fl_value_new_null());
+  fl_value_append_take(values, self->device_uri != nullptr ? fl_value_new_string(self->device_uri) : fl_value_new_null());
   return values;
 }
 
@@ -1139,7 +1254,39 @@ static FlutterPrintPrinterInfo* flutter_print_printer_info_new_from_list(FlValue
     is_available_value = fl_value_get_bool(value5);
     is_available = &is_available_value;
   }
-  return flutter_print_printer_info_new(label, address, details, is_default, capabilities, is_available);
+  FlValue* value6 = fl_value_get_list_value(values, 6);
+  int64_t* printer_status = nullptr;
+  int64_t printer_status_value;
+  if (fl_value_get_type(value6) != FL_VALUE_TYPE_NULL) {
+    printer_status_value = fl_value_get_int(value6);
+    printer_status = &printer_status_value;
+  }
+  FlValue* value7 = fl_value_get_list_value(values, 7);
+  const gchar* driver_name = nullptr;
+  if (fl_value_get_type(value7) != FL_VALUE_TYPE_NULL) {
+    driver_name = fl_value_get_string(value7);
+  }
+  FlValue* value8 = fl_value_get_list_value(values, 8);
+  const gchar* port_name = nullptr;
+  if (fl_value_get_type(value8) != FL_VALUE_TYPE_NULL) {
+    port_name = fl_value_get_string(value8);
+  }
+  FlValue* value9 = fl_value_get_list_value(values, 9);
+  const gchar* location = nullptr;
+  if (fl_value_get_type(value9) != FL_VALUE_TYPE_NULL) {
+    location = fl_value_get_string(value9);
+  }
+  FlValue* value10 = fl_value_get_list_value(values, 10);
+  const gchar* make_and_model = nullptr;
+  if (fl_value_get_type(value10) != FL_VALUE_TYPE_NULL) {
+    make_and_model = fl_value_get_string(value10);
+  }
+  FlValue* value11 = fl_value_get_list_value(values, 11);
+  const gchar* device_uri = nullptr;
+  if (fl_value_get_type(value11) != FL_VALUE_TYPE_NULL) {
+    device_uri = fl_value_get_string(value11);
+  }
+  return flutter_print_printer_info_new(label, address, details, is_default, capabilities, is_available, printer_status, driver_name, port_name, location, make_and_model, device_uri);
 }
 
 gboolean flutter_print_printer_info_equals(FlutterPrintPrinterInfo* a, FlutterPrintPrinterInfo* b) {
@@ -1170,6 +1317,27 @@ gboolean flutter_print_printer_info_equals(FlutterPrintPrinterInfo* a, FlutterPr
   if (a->is_available != nullptr && *a->is_available != *b->is_available) {
     return FALSE;
   }
+  if ((a->printer_status == nullptr) != (b->printer_status == nullptr)) {
+    return FALSE;
+  }
+  if (a->printer_status != nullptr && *a->printer_status != *b->printer_status) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->driver_name, b->driver_name) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->port_name, b->port_name) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->location, b->location) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->make_and_model, b->make_and_model) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->device_uri, b->device_uri) != 0) {
+    return FALSE;
+  }
   return TRUE;
 }
 
@@ -1182,6 +1350,12 @@ guint flutter_print_printer_info_hash(FlutterPrintPrinterInfo* self) {
   result = result * 31 + static_cast<guint>(self->is_default);
   result = result * 31 + flutter_print_printer_capabilities_hash(self->capabilities);
   result = result * 31 + (self->is_available != nullptr ? static_cast<guint>(*self->is_available) : 0);
+  result = result * 31 + (self->printer_status != nullptr ? static_cast<guint>(*self->printer_status) : 0);
+  result = result * 31 + (self->driver_name != nullptr ? g_str_hash(self->driver_name) : 0);
+  result = result * 31 + (self->port_name != nullptr ? g_str_hash(self->port_name) : 0);
+  result = result * 31 + (self->location != nullptr ? g_str_hash(self->location) : 0);
+  result = result * 31 + (self->make_and_model != nullptr ? g_str_hash(self->make_and_model) : 0);
+  result = result * 31 + (self->device_uri != nullptr ? g_str_hash(self->device_uri) : 0);
   return result;
 }
 
@@ -1223,6 +1397,48 @@ gchar* flutter_print_printer_info_to_string(FlutterPrintPrinterInfo* self) {
   g_string_append(str, ", is_available: ");
   if (self->is_available != nullptr) {
     g_string_append(str, *self->is_available ? "true" : "false");
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", printer_status: ");
+  if (self->printer_status != nullptr) {
+    g_string_append_printf(str, "%" G_GINT64_FORMAT, *self->printer_status);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", driver_name: ");
+  if (self->driver_name != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->driver_name);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", port_name: ");
+  if (self->port_name != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->port_name);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", location: ");
+  if (self->location != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->location);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", make_and_model: ");
+  if (self->make_and_model != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->make_and_model);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", device_uri: ");
+  if (self->device_uri != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->device_uri);
   }
   else {
     g_string_append(str, "null");
@@ -1857,15 +2073,93 @@ static void flutter_print_flutter_print_api_cancel_print_job_response_class_init
   G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_cancel_print_job_response_dispose;
 }
 
-static FlutterPrintFlutterPrintApiCancelPrintJobResponse* flutter_print_flutter_print_api_cancel_print_job_response_new() {
+static FlutterPrintFlutterPrintApiCancelPrintJobResponse* flutter_print_flutter_print_api_cancel_print_job_response_new(gboolean return_value) {
   FlutterPrintFlutterPrintApiCancelPrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_CANCEL_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_cancel_print_job_response_get_type(), nullptr));
   self->value = fl_value_new_list();
-  fl_value_append_take(self->value, fl_value_new_null());
+  fl_value_append_take(self->value, fl_value_new_bool(return_value));
   return self;
 }
 
 static FlutterPrintFlutterPrintApiCancelPrintJobResponse* flutter_print_flutter_print_api_cancel_print_job_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
   FlutterPrintFlutterPrintApiCancelPrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_CANCEL_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_cancel_print_job_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
+G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiPausePrintJobResponse, flutter_print_flutter_print_api_pause_print_job_response, FLUTTER_PRINT, FLUTTER_PRINT_API_PAUSE_PRINT_JOB_RESPONSE, GObject)
+
+struct _FlutterPrintFlutterPrintApiPausePrintJobResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(FlutterPrintFlutterPrintApiPausePrintJobResponse, flutter_print_flutter_print_api_pause_print_job_response, G_TYPE_OBJECT)
+
+static void flutter_print_flutter_print_api_pause_print_job_response_dispose(GObject* object) {
+  FlutterPrintFlutterPrintApiPausePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PAUSE_PRINT_JOB_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(flutter_print_flutter_print_api_pause_print_job_response_parent_class)->dispose(object);
+}
+
+static void flutter_print_flutter_print_api_pause_print_job_response_init(FlutterPrintFlutterPrintApiPausePrintJobResponse* self) {
+}
+
+static void flutter_print_flutter_print_api_pause_print_job_response_class_init(FlutterPrintFlutterPrintApiPausePrintJobResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_pause_print_job_response_dispose;
+}
+
+static FlutterPrintFlutterPrintApiPausePrintJobResponse* flutter_print_flutter_print_api_pause_print_job_response_new(gboolean return_value) {
+  FlutterPrintFlutterPrintApiPausePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PAUSE_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_pause_print_job_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_bool(return_value));
+  return self;
+}
+
+static FlutterPrintFlutterPrintApiPausePrintJobResponse* flutter_print_flutter_print_api_pause_print_job_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  FlutterPrintFlutterPrintApiPausePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_PAUSE_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_pause_print_job_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
+G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiResumePrintJobResponse, flutter_print_flutter_print_api_resume_print_job_response, FLUTTER_PRINT, FLUTTER_PRINT_API_RESUME_PRINT_JOB_RESPONSE, GObject)
+
+struct _FlutterPrintFlutterPrintApiResumePrintJobResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(FlutterPrintFlutterPrintApiResumePrintJobResponse, flutter_print_flutter_print_api_resume_print_job_response, G_TYPE_OBJECT)
+
+static void flutter_print_flutter_print_api_resume_print_job_response_dispose(GObject* object) {
+  FlutterPrintFlutterPrintApiResumePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_RESUME_PRINT_JOB_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(flutter_print_flutter_print_api_resume_print_job_response_parent_class)->dispose(object);
+}
+
+static void flutter_print_flutter_print_api_resume_print_job_response_init(FlutterPrintFlutterPrintApiResumePrintJobResponse* self) {
+}
+
+static void flutter_print_flutter_print_api_resume_print_job_response_class_init(FlutterPrintFlutterPrintApiResumePrintJobResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_resume_print_job_response_dispose;
+}
+
+static FlutterPrintFlutterPrintApiResumePrintJobResponse* flutter_print_flutter_print_api_resume_print_job_response_new(gboolean return_value) {
+  FlutterPrintFlutterPrintApiResumePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_RESUME_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_resume_print_job_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_bool(return_value));
+  return self;
+}
+
+static FlutterPrintFlutterPrintApiResumePrintJobResponse* flutter_print_flutter_print_api_resume_print_job_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  FlutterPrintFlutterPrintApiResumePrintJobResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_RESUME_PRINT_JOB_RESPONSE(g_object_new(flutter_print_flutter_print_api_resume_print_job_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
   fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
@@ -2002,6 +2296,36 @@ static void flutter_print_flutter_print_api_cancel_print_job_cb(FlBasicMessageCh
   self->vtable->cancel_print_job(printer_address, job_id, handle, self->user_data);
 }
 
+static void flutter_print_flutter_print_api_pause_print_job_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  FlutterPrintFlutterPrintApi* self = FLUTTER_PRINT_FLUTTER_PRINT_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->pause_print_job == nullptr) {
+    return;
+  }
+
+  FlValue* value0 = fl_value_get_list_value(message_, 0);
+  const gchar* printer_address = fl_value_get_string(value0);
+  FlValue* value1 = fl_value_get_list_value(message_, 1);
+  int64_t job_id = fl_value_get_int(value1);
+  g_autoptr(FlutterPrintFlutterPrintApiResponseHandle) handle = flutter_print_flutter_print_api_response_handle_new(channel, response_handle);
+  self->vtable->pause_print_job(printer_address, job_id, handle, self->user_data);
+}
+
+static void flutter_print_flutter_print_api_resume_print_job_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  FlutterPrintFlutterPrintApi* self = FLUTTER_PRINT_FLUTTER_PRINT_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->resume_print_job == nullptr) {
+    return;
+  }
+
+  FlValue* value0 = fl_value_get_list_value(message_, 0);
+  const gchar* printer_address = fl_value_get_string(value0);
+  FlValue* value1 = fl_value_get_list_value(message_, 1);
+  int64_t job_id = fl_value_get_int(value1);
+  g_autoptr(FlutterPrintFlutterPrintApiResponseHandle) handle = flutter_print_flutter_print_api_response_handle_new(channel, response_handle);
+  self->vtable->resume_print_job(printer_address, job_id, handle, self->user_data);
+}
+
 void flutter_print_flutter_print_api_set_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix, const FlutterPrintFlutterPrintApiVTable* vtable, gpointer user_data, GDestroyNotify user_data_free_func) {
   g_autofree gchar* dot_suffix = suffix != nullptr ? g_strdup_printf(".%s", suffix) : g_strdup("");
   g_autoptr(FlutterPrintFlutterPrintApi) api_data = flutter_print_flutter_print_api_new(vtable, user_data, user_data_free_func);
@@ -2028,6 +2352,12 @@ void flutter_print_flutter_print_api_set_method_handlers(FlBinaryMessenger* mess
   g_autofree gchar* cancel_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.cancelPrintJob%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) cancel_print_job_channel = fl_basic_message_channel_new(messenger, cancel_print_job_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(cancel_print_job_channel, flutter_print_flutter_print_api_cancel_print_job_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* pause_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) pause_print_job_channel = fl_basic_message_channel_new(messenger, pause_print_job_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(pause_print_job_channel, flutter_print_flutter_print_api_pause_print_job_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* resume_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) resume_print_job_channel = fl_basic_message_channel_new(messenger, resume_print_job_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(resume_print_job_channel, flutter_print_flutter_print_api_resume_print_job_cb, g_object_ref(api_data), g_object_unref);
 }
 
 void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix) {
@@ -2055,6 +2385,12 @@ void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* me
   g_autofree gchar* cancel_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.cancelPrintJob%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) cancel_print_job_channel = fl_basic_message_channel_new(messenger, cancel_print_job_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(cancel_print_job_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* pause_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) pause_print_job_channel = fl_basic_message_channel_new(messenger, pause_print_job_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(pause_print_job_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* resume_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) resume_print_job_channel = fl_basic_message_channel_new(messenger, resume_print_job_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(resume_print_job_channel, nullptr, nullptr, nullptr);
 }
 
 void flutter_print_flutter_print_api_respond_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle) {
@@ -2153,8 +2489,8 @@ void flutter_print_flutter_print_api_respond_error_print_submit(FlutterPrintFlut
   }
 }
 
-void flutter_print_flutter_print_api_respond_cancel_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle) {
-  g_autoptr(FlutterPrintFlutterPrintApiCancelPrintJobResponse) response = flutter_print_flutter_print_api_cancel_print_job_response_new();
+void flutter_print_flutter_print_api_respond_cancel_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value) {
+  g_autoptr(FlutterPrintFlutterPrintApiCancelPrintJobResponse) response = flutter_print_flutter_print_api_cancel_print_job_response_new(return_value);
   g_autoptr(GError) error = nullptr;
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "cancelPrintJob", error->message);
@@ -2166,5 +2502,37 @@ void flutter_print_flutter_print_api_respond_error_cancel_print_job(FlutterPrint
   g_autoptr(GError) error = nullptr;
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "cancelPrintJob", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_pause_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value) {
+  g_autoptr(FlutterPrintFlutterPrintApiPausePrintJobResponse) response = flutter_print_flutter_print_api_pause_print_job_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "pausePrintJob", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_error_pause_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(FlutterPrintFlutterPrintApiPausePrintJobResponse) response = flutter_print_flutter_print_api_pause_print_job_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "pausePrintJob", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_resume_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value) {
+  g_autoptr(FlutterPrintFlutterPrintApiResumePrintJobResponse) response = flutter_print_flutter_print_api_resume_print_job_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "resumePrintJob", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_error_resume_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(FlutterPrintFlutterPrintApiResumePrintJobResponse) response = flutter_print_flutter_print_api_resume_print_job_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "resumePrintJob", error->message);
   }
 }

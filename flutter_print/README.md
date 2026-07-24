@@ -77,6 +77,101 @@ final png = await FlutterPrint.previewWidget(
 Image.memory(png);
 ```
 
+### Print job status
+
+Track spooler progress with a **`Stream<PrintJobInfo>`** (similar in spirit to
+desktop print-job APIs). Each event carries `id`, `title`, and `rawStatus`; use
+`job.parsedStatus` for a cross-platform [`PrintJobStatus`](lib/src/print_job_status.dart)
+enum.
+
+See the [feature backlog](./docs/features/FEATURES.zh-CN.md) (中文) for planned work.
+
+**Recommended:** call `listPrinters()`, set `PrintOptions.printerAddress` to the
+queue name (`PrinterInfo.address` on Windows / Linux / macOS), then use
+`printWithStatus`.
+
+**Completion modes** ([`PrintJobCompletionMode`](lib/src/print_job_status.dart)):
+default **`dequeueSuccess`** (job leaves queue); **`spoolerTerminal`** (printed/
+completed while queued); **`spoolerComplete`** (Windows `JOB_STATUS_COMPLETE` or
+CUPS state `9`, with dequeue fallback for virtual printers).
+
+```dart
+await for (final job in FlutterPrint.printWithStatus(
+  '/path/to/document.pdf',
+  options: PrintOptions(printerAddress: 'Microsoft Print to PDF'),
+  pollInterval: const Duration(seconds: 2),
+)) {
+  debugPrint('${job.id} ${job.parsedStatus} (raw ${job.rawStatus})');
+}
+
+// Or submit manually and watch an existing job id.
+final jobId = await FlutterPrint.printSubmit(
+  '/path/to/document.pdf',
+  options: PrintOptions(printerAddress: 'my_printer'),
+);
+if (jobId >= 0) {
+  await for (final job in FlutterPrint.watchPrintJob('my_printer', jobId)) {
+    debugPrint('${job.parsedStatus}');
+  }
+}
+
+// List jobs in a queue (desktop spooler or Android jobs from this app).
+final jobs = await FlutterPrint.listPrintJobs('my_printer');
+
+// Cancel when supported.
+await FlutterPrint.cancelPrintJob('my_printer', jobId);
+
+// Optional: spooler document title (Windows queue name, CUPS job title).
+await for (final job in FlutterPrint.printWithStatus(
+  '/path/to/document.pdf',
+  options: PrintOptions(
+    printerAddress: 'my_printer',
+    documentTitle: '检测报告',
+  ),
+  requirePrintedBeforeDequeue: true,
+  watchPrinterStatus: true,
+)) {
+  debugPrint('${job.parsedStatus}');
+}
+
+// PrinterInfo also exposes driverName, portName, location (Windows) and
+// makeAndModel, deviceUri (Linux CUPS) from listPrinters().
+```
+
+When the platform cannot return a job id (`printSubmit` returns **`-1`**), e.g.
+iOS system print UI or Web, `printWithStatus` falls back to a normal
+`FlutterPrint.print()` and emits a single completion event.
+
+### printing_ffi-style API (in this package)
+
+For apps migrating from **printing_ffi** / HeartMonitorx-style flows:
+
+```dart
+final defaultPrinter = await FlutterPrint.getDefaultPrinter();
+final address = await FlutterPrint.resolvePrinterAddress(savedPrinterName);
+
+await for (final job in FlutterPrint.printPdfAndStreamStatus(
+  savedPrinterName,
+  reportPdfPath,
+  docName: '检测报告',
+  pollInterval: const Duration(seconds: 1),
+  treatRetainedAsSuccess: true, // Windows retained jobs count as done
+)) {
+  print('${job.id} ${job.status}');
+}
+
+await FlutterPrint.cancelPrintJobByName(savedPrinterName, jobId);
+// Or: FlutterPrint.listPrintJobsStream(printerName);
+// describePrinterStatus(printer) for PrinterInfo.printerStatus (Windows)
+```
+
+See also top-level helpers in `print_job_flow.dart`, `printer_helpers.dart`,
+`printer_status_helper.dart`.
+
+The **example app** (`flutter_print/example`) logs these events to the console
+with the `[flutter_print_example]` prefix when you use **Print — direct** (file
+sources) or **List jobs**.
+
 ---
 
 ## Feature support by platform
@@ -86,10 +181,21 @@ Image.memory(png);
 | Direct print   |         | ✔️† | ✔️   | ✔️      | ✔️   |     |
 | Setup & print  | ✔️      | ✔️ | ✔️   | ✔️      | ✔️§  | ✔️  |
 | List printers  |         |     | ✔️   | ✔️      | ✔️   |     |
+| Print job stream | ✔️‡  | ‡   | ✔️¶  | ✔️      | ✔️¶  | ‡   |
+| List / cancel jobs | ✔️‡ |     | ✔️¶  | ✔️      | ✔️¶  |     |
 
-† On iOS, with a `printerAddress` from `FlutterPrint.ios?.pickPrinter()` (e.g. `ipp://printer.local./ipp/print`),
+‡ **Job id** — Android tracks jobs started via `printSubmit` in this app; iOS /
+Web return `-1` or empty lists (no spooler API). **macOS** and **Linux** use
+CUPS (`printSubmit`, `listPrintJobs`, cancel/pause/resume). **Stream** still
+works via `printWithStatus` fallback where id is unavailable.
 
-§ On Linux it uses `xdg-open` to open the file in its default viewer.
+¶ **CUPS** — macOS and Linux queue APIs; Linux requires CUPS at build time.
+
+† On iOS, direct print without the system dialog requires
+`PrintOptions.printerAddress` from `FlutterPrint.ios?.pickPrinter()` (e.g.
+`ipp://printer.local./ipp/print`).
+
+§ On Linux, **Setup & print** uses `xdg-open` to open the file in its default viewer.
 
 ## Option support by platform
 

@@ -18,4 +18,8 @@ std::vector<JobEntry> ListPrintJobsForPrinter(const std::wstring& printer_name);
 
 bool CancelPrintJobOnPrinter(const std::wstring& printer_name, int job_id);
 
+bool PausePrintJobOnPrinter(const std::wstring& printer_name, int job_id);
+
+bool ResumePrintJobOnPrinter(const std::wstring& printer_name, int job_id);
+
 }  // namespace flutter_print

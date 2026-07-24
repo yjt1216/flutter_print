@@ -259,6 +259,7 @@ class PageMargins {
 class PrintOptions {
   PrintOptions({
     this.printerAddress,
+    this.documentTitle,
     this.pageSize,
     this.margins,
     this.copies,
@@ -276,6 +277,10 @@ class PrintOptions {
   ///   `'ipp://printer.local/ipp/print'`). When provided the job is sent
   ///   directly without showing a dialog.
   String? printerAddress;
+
+  /// Title shown in the print queue (Windows spooler document name, CUPS job
+  /// title). When `null`, platforms use the file name.
+  String? documentTitle;
 
   /// Desired output page size.
   ///
@@ -314,6 +319,7 @@ class PrintOptions {
   List<Object?> _toList() {
     return <Object?>[
       printerAddress,
+      documentTitle,
       pageSize,
       margins,
       copies,
@@ -330,12 +336,13 @@ class PrintOptions {
     result as List<Object?>;
     return PrintOptions(
       printerAddress: result[0] as String?,
-      pageSize: result[1] as PageSize?,
-      margins: result[2] as PageMargins?,
-      copies: result[3] as int?,
-      landscape: result[4] as bool?,
-      color: result[5] as bool?,
-      duplexMode: result[6] as DuplexMode?,
+      documentTitle: result[1] as String?,
+      pageSize: result[2] as PageSize?,
+      margins: result[3] as PageMargins?,
+      copies: result[4] as int?,
+      landscape: result[5] as bool?,
+      color: result[6] as bool?,
+      duplexMode: result[7] as DuplexMode?,
     );
   }
 
@@ -348,7 +355,7 @@ class PrintOptions {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(printerAddress, other.printerAddress) && _deepEquals(pageSize, other.pageSize) && _deepEquals(margins, other.margins) && _deepEquals(copies, other.copies) && _deepEquals(landscape, other.landscape) && _deepEquals(color, other.color) && _deepEquals(duplexMode, other.duplexMode);
+    return _deepEquals(printerAddress, other.printerAddress) && _deepEquals(documentTitle, other.documentTitle) && _deepEquals(pageSize, other.pageSize) && _deepEquals(margins, other.margins) && _deepEquals(copies, other.copies) && _deepEquals(landscape, other.landscape) && _deepEquals(color, other.color) && _deepEquals(duplexMode, other.duplexMode);
   }
 
   @override
@@ -357,7 +364,7 @@ class PrintOptions {
 
   @override
   String toString() {
-    return 'PrintOptions(printerAddress: $printerAddress, pageSize: $pageSize, margins: $margins, copies: $copies, landscape: $landscape, color: $color, duplexMode: $duplexMode)';
+    return 'PrintOptions(printerAddress: $printerAddress, documentTitle: $documentTitle, pageSize: $pageSize, margins: $margins, copies: $copies, landscape: $landscape, color: $color, duplexMode: $duplexMode)';
   }
 }
 
@@ -432,6 +439,13 @@ class PrinterCapabilities {
 }
 
 /// Describes a single printer returned by [FlutterPrintApi.listPrinters].
+///
+/// Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+/// metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+/// the physical device or driver when building a **printer profile** (e.g.
+/// which fault-handling rules apply). They do not replace vendor SDK status
+/// codes — combine with [printerStatus], [isAvailable], and print-job status
+/// streams from the main `flutter_print` package.
 class PrinterInfo {
   PrinterInfo({
     required this.label,
@@ -440,6 +454,12 @@ class PrinterInfo {
     required this.isDefault,
     required this.capabilities,
     this.isAvailable,
+    this.printerStatus,
+    this.driverName,
+    this.portName,
+    this.location,
+    this.makeAndModel,
+    this.deviceUri,
   });
 
   /// Human-readable display name shown to the user (e.g. `'HP LaserJet Pro'`).
@@ -455,8 +475,12 @@ class PrinterInfo {
   /// - **Android** — not set; the user selects the printer inside the dialog.
   String? address;
 
-  /// Optional longer description provided by the platform (e.g. the printer
-  /// model or location). May be `null`.
+  /// Optional extra text from the platform. Meaning varies by OS:
+  ///
+  /// - **Windows** — driver comment (`pComment`), not the same as [location].
+  /// - **Linux (CUPS)** — often `printer-location` when set.
+  ///
+  /// Prefer [makeAndModel] on CUPS for model identification. May be `null`.
   String? details;
 
   /// Whether this is the current system-default printer.
@@ -475,6 +499,62 @@ class PrinterInfo {
   /// Platform support: macOS, Windows, Linux.
   bool? isAvailable;
 
+  /// Raw printer status from the spooler when the platform exposes it.
+  ///
+  /// **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+  /// helpers exported from the `flutter_print` package (`describePrinterStatus`,
+  /// `isBlockingOsPrinterStatus`, or `printWithStatus` with
+  /// `watchPrinterStatus: true`).
+  ///
+  /// **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+  ///
+  /// Not the same as per-job status — see [PrintJobInfo.rawStatus].
+  int? printerStatus;
+
+  /// Installed print driver name (Windows queue properties → Driver).
+  ///
+  /// Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+  /// driver for the same device) or to key a driver-based printer profile.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  String? driverName;
+
+  /// Port the queue is bound to (Windows `pPortName`).
+  ///
+  /// Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+  /// Helps infer **connection type** (USB vs network vs virtual sink).
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  String? portName;
+
+  /// User-visible location string (Windows `pLocation`), e.g. room or site.
+  ///
+  /// Distinct from [details] on Windows (comment field). On Linux, location
+  /// may appear in [details] instead; [location] stays `null`.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  String? location;
+
+  /// Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+  /// e.g. `KONICA MINOLTA bizhub C458`.
+  ///
+  /// Primary field for **model-based printer profiles** on Linux. On Windows,
+  /// [label] often already contains the model; use [driverName] as a secondary
+  /// key.
+  ///
+  /// **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+  /// added later.
+  String? makeAndModel;
+
+  /// Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+  /// `usb://Vendor/Model?serial=…`, `socket://…`.
+  ///
+  /// Useful for debugging connectivity and telling IPP/USB/network backends
+  /// apart; not required for normal printing ([address] is the queue name).
+  ///
+  /// **Platform:** Linux (CUPS); `null` elsewhere.
+  String? deviceUri;
+
   List<Object?> _toList() {
     return <Object?>[
       label,
@@ -483,6 +563,12 @@ class PrinterInfo {
       isDefault,
       capabilities,
       isAvailable,
+      printerStatus,
+      driverName,
+      portName,
+      location,
+      makeAndModel,
+      deviceUri,
     ];
   }
 
@@ -498,6 +584,12 @@ class PrinterInfo {
       isDefault: result[3]! as bool,
       capabilities: result[4]! as PrinterCapabilities,
       isAvailable: result[5] as bool?,
+      printerStatus: result[6] as int?,
+      driverName: result[7] as String?,
+      portName: result[8] as String?,
+      location: result[9] as String?,
+      makeAndModel: result[10] as String?,
+      deviceUri: result[11] as String?,
     );
   }
 
@@ -510,7 +602,7 @@ class PrinterInfo {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(label, other.label) && _deepEquals(address, other.address) && _deepEquals(details, other.details) && _deepEquals(isDefault, other.isDefault) && _deepEquals(capabilities, other.capabilities) && _deepEquals(isAvailable, other.isAvailable);
+    return _deepEquals(label, other.label) && _deepEquals(address, other.address) && _deepEquals(details, other.details) && _deepEquals(isDefault, other.isDefault) && _deepEquals(capabilities, other.capabilities) && _deepEquals(isAvailable, other.isAvailable) && _deepEquals(printerStatus, other.printerStatus) && _deepEquals(driverName, other.driverName) && _deepEquals(portName, other.portName) && _deepEquals(location, other.location) && _deepEquals(makeAndModel, other.makeAndModel) && _deepEquals(deviceUri, other.deviceUri);
   }
 
   @override
@@ -519,7 +611,7 @@ class PrinterInfo {
 
   @override
   String toString() {
-    return 'PrinterInfo(label: $label, address: $address, details: $details, isDefault: $isDefault, capabilities: $capabilities, isAvailable: $isAvailable)';
+    return 'PrinterInfo(label: $label, address: $address, details: $details, isDefault: $isDefault, capabilities: $capabilities, isAvailable: $isAvailable, printerStatus: $printerStatus, driverName: $driverName, portName: $portName, location: $location, makeAndModel: $makeAndModel, deviceUri: $deviceUri)';
   }
 }
 
@@ -833,8 +925,8 @@ class FlutterPrintApi {
     return pigeonVar_replyValue! as int;
   }
 
-  /// Cancels a queued job. Unsupported platforms throw [PlatformException].
-  Future<void> cancelPrintJob(String printerAddress, int jobId) async {
+  /// Cancels a queued job. Returns `false` when the OS rejects the operation.
+  Future<bool> cancelPrintJob(String printerAddress, int jobId) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.cancelPrintJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -844,11 +936,52 @@ class FlutterPrintApi {
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[printerAddress, jobId]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
-    _extractReplyValueOrThrow(
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
         pigeonVar_replyList,
         pigeonVar_channelName,
-        isNullValid: true,
+        isNullValid: false,
     )
     ;
+    return pigeonVar_replyValue! as bool;
+  }
+
+  /// Pauses a queued job. Returns `false` when unsupported or rejected.
+  Future<bool> pausePrintJob(String printerAddress, int jobId) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[printerAddress, jobId]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
+    return pigeonVar_replyValue! as bool;
+  }
+
+  /// Resumes a paused job. Returns `false` when unsupported or rejected.
+  Future<bool> resumePrintJob(String printerAddress, int jobId) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[printerAddress, jobId]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
+    return pigeonVar_replyValue! as bool;
   }
 }

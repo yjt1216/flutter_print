@@ -82,6 +82,22 @@ void FlutterPrintPlugin::Print(
   }).detach();
 }
 
+namespace {
+
+std::wstring DocumentTitleForJob(const PrintOptions* options,
+                                 const std::wstring& w_path) {
+  if (options) {
+    const std::string* title = options->document_title();
+    if (title && !title->empty()) {
+      return Utf8ToWide(*title);
+    }
+  }
+  const size_t slash = w_path.find_last_of(L"\\/");
+  return slash == std::wstring::npos ? w_path : w_path.substr(slash + 1);
+}
+
+}  // namespace
+
 std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
     const std::string& file_path, const PrintOptions* options,
     int* out_job_id) {
@@ -116,7 +132,8 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
       return FlutterError("PRINTER_ERROR",
                           "Cannot create printer DC for: " +
                               WideToUtf8(wPrinter.c_str()));
-    auto err = RenderOrFallback(hdc, wPath, mime, wPrinter, softwareCopies);
+    auto err = RenderOrFallback(hdc, wPath, mime, wPrinter, softwareCopies,
+                                DocumentTitleForJob(options, wPath));
     if (!err.has_value() && out_job_id) {
       for (const auto& entry : ListPrintJobsForPrinter(wPrinter)) {
         if (entry.id > *out_job_id) {
@@ -130,7 +147,8 @@ std::optional<FlutterError> FlutterPrintPlugin::PrintInternal(
   // Other file types: delegate to the file's associated application.
   const std::string* pn = options ? options->printer_address() : nullptr;
   const std::wstring wPrinter = (pn && !pn->empty()) ? Utf8ToWide(*pn) : std::wstring{};
-  return RenderOrFallback(nullptr, wPath, mime, wPrinter);
+  return RenderOrFallback(nullptr, wPath, mime, wPrinter, 1,
+                        DocumentTitleForJob(options, wPath));
 }
 
 void FlutterPrintPlugin::PrintPreview(
@@ -303,11 +321,31 @@ void FlutterPrintPlugin::ListPrinters(
         detailsStr = WideToUtf8(info[i].pComment);
         detailsPtr = &detailsStr;
       }
+      std::string driverStr;
+      const std::string* driverPtr = nullptr;
+      if (info[i].pDriverName && info[i].pDriverName[0]) {
+        driverStr = WideToUtf8(info[i].pDriverName);
+        driverPtr = &driverStr;
+      }
+      std::string portStr;
+      const std::string* portPtr = nullptr;
+      if (info[i].pPortName && info[i].pPortName[0]) {
+        portStr = WideToUtf8(info[i].pPortName);
+        portPtr = &portStr;
+      }
+      std::string locationStr;
+      const std::string* locationPtr = nullptr;
+      if (info[i].pLocation && info[i].pLocation[0]) {
+        locationStr = WideToUtf8(info[i].pLocation);
+        locationPtr = &locationStr;
+      }
       const std::string nameUtf8 = WideToUtf8(name);
       bool avail = !(info[i].Status & PRINTER_STATUS_OFFLINE);
+      const int64_t printer_status = static_cast<int64_t>(info[i].Status);
       printers.push_back(flutter::CustomEncodableValue(PrinterInfo(
           nameUtf8, &nameUtf8, detailsPtr, std::wstring(name) == defaultPrinter,
-          caps, &avail)));
+          caps, &avail, &printer_status, driverPtr, portPtr, locationPtr,
+          nullptr, nullptr)));
     }
     reply(std::move(printers));
   }).detach();
@@ -365,18 +403,42 @@ void FlutterPrintPlugin::PrintSubmit(
 
 void FlutterPrintPlugin::CancelPrintJob(
     const std::string& printer_address, int64_t job_id,
-    std::function<void(std::optional<FlutterError> reply)> result) {
+    std::function<void(ErrorOr<bool> reply)> result) {
   std::thread([printer_address, job_id, result = std::move(result),
                alive = alive_]() {
     const std::wstring wPrinter = Utf8ToWide(printer_address);
-    if (!CancelPrintJobOnPrinter(wPrinter, static_cast<int>(job_id))) {
-      if (alive->load()) {
-        result(FlutterError("PRINT_ERROR", "Failed to cancel print job"));
-      }
-      return;
-    }
+    const bool ok =
+        CancelPrintJobOnPrinter(wPrinter, static_cast<int>(job_id));
     if (alive->load()) {
-      result(std::nullopt);
+      result(ok);
+    }
+  }).detach();
+}
+
+void FlutterPrintPlugin::PausePrintJob(
+    const std::string& printer_address, int64_t job_id,
+    std::function<void(ErrorOr<bool> reply)> result) {
+  std::thread([printer_address, job_id, result = std::move(result),
+               alive = alive_]() {
+    const std::wstring wPrinter = Utf8ToWide(printer_address);
+    const bool ok =
+        PausePrintJobOnPrinter(wPrinter, static_cast<int>(job_id));
+    if (alive->load()) {
+      result(ok);
+    }
+  }).detach();
+}
+
+void FlutterPrintPlugin::ResumePrintJob(
+    const std::string& printer_address, int64_t job_id,
+    std::function<void(ErrorOr<bool> reply)> result) {
+  std::thread([printer_address, job_id, result = std::move(result),
+               alive = alive_]() {
+    const std::wstring wPrinter = Utf8ToWide(printer_address);
+    const bool ok =
+        ResumePrintJobOnPrinter(wPrinter, static_cast<int>(job_id));
+    if (alive->load()) {
+      result(ok);
     }
   }).detach();
 }

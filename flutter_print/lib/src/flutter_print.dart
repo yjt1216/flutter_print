@@ -5,6 +5,9 @@ import 'package:flutter_print_platform_interface/flutter_print_platform_interfac
 import 'bytes_helper/bytes_helper.dart';
 import 'document_renderer.dart';
 import 'print_job_monitor.dart' as job_monitor;
+import 'print_job_flow.dart' as job_flow;
+import 'print_job_status.dart';
+import 'printer_helpers.dart' as ph;
 
 class FlutterPrint {
   FlutterPrint._();
@@ -158,35 +161,116 @@ class FlutterPrint {
     return FlutterPrintPlatform.instance.printSubmit(filePath, options: options);
   }
 
-  /// Polls the spooler until [jobId] reaches a terminal state.
+  /// System default printer from [listPrinters], if any.
+  static Future<PrinterInfo?> getDefaultPrinter() => ph.getDefaultPrinter();
+
+  static Future<String?> resolvePrinterAddress(String nameOrAddress) =>
+      ph.resolvePrinterAddress(nameOrAddress);
+
+  /// printing_ffi-compatible: [printerName] + PDF path + optional [docName].
+  static Stream<PrintJobInfo> printPdfAndStreamStatus(
+    String printerName,
+    String pdfFilePath, {
+    String? docName,
+    int? copies,
+    Duration pollInterval = const Duration(seconds: 2),
+    PrintOptions? options,
+    bool treatRetainedAsSuccess = true,
+  }) {
+    return job_flow.printPdfAndStreamStatus(
+      printerName,
+      pdfFilePath,
+      docName: docName,
+      copies: copies,
+      pollInterval: pollInterval,
+      options: options,
+      treatRetainedAsSuccess: treatRetainedAsSuccess,
+    );
+  }
+
+  /// Whole-queue polling stream (printing_ffi `listPrintJobsStream`).
+  static Stream<List<PrintJobInfo>> listPrintJobsStream(
+    String printerNameOrAddress, {
+    Duration pollInterval = const Duration(seconds: 2),
+  }) {
+    return job_flow.listPrintJobsStream(
+      printerNameOrAddress,
+      pollInterval: pollInterval,
+    );
+  }
+
+  /// Polls the spooler for [jobId]. Default [PrintJobCompletionMode.spoolerTerminal].
   static Stream<PrintJobInfo> watchPrintJob(
     String printerAddress,
     int jobId, {
     Duration pollInterval = const Duration(seconds: 2),
+    PrintJobCompletionMode completionMode =
+        PrintJobCompletionMode.spoolerTerminal,
+    bool treatRetainedAsSuccess = false,
+    bool requirePrintedBeforeDequeue = false,
+    bool watchPrinterStatus = false,
+    bool failOnBlockingPrinterStatus = true,
   }) {
     return job_monitor.watchPrintJob(
       printerAddress,
       jobId,
       pollInterval: pollInterval,
+      completionMode: completionMode,
+      treatRetainedAsSuccess: treatRetainedAsSuccess,
+      requirePrintedBeforeDequeue: requirePrintedBeforeDequeue,
+      watchPrinterStatus: watchPrinterStatus,
+      failOnBlockingPrinterStatus: failOnBlockingPrinterStatus,
     );
   }
 
-  /// Prints [filePath] and emits spooler status updates until completion.
+  /// Prints [filePath] and streams status. Default **出队即成功**
+  /// ([PrintJobCompletionMode.dequeueSuccess]).
+  ///
+  /// Set [watchPrinterStatus] to poll [PrinterInfo.printerStatus] while the job
+  /// is tracked. When [failOnBlockingPrinterStatus] is true (default), the
+  /// stream ends with [PrintBlockedByPrinterStatus] on paper-out/offline etc.
   static Stream<PrintJobInfo> printWithStatus(
     String filePath, {
     PrintOptions? options,
     Duration pollInterval = const Duration(seconds: 2),
+    PrintJobCompletionMode completionMode =
+        PrintJobCompletionMode.dequeueSuccess,
+    bool treatRetainedAsSuccess = false,
+    bool requirePrintedBeforeDequeue = false,
+    bool watchPrinterStatus = false,
+    bool failOnBlockingPrinterStatus = true,
   }) {
     return job_monitor.printWithStatus(
       filePath,
       options: options,
       pollInterval: pollInterval,
+      completionMode: completionMode,
+      treatRetainedAsSuccess: treatRetainedAsSuccess,
+      requirePrintedBeforeDequeue: requirePrintedBeforeDequeue,
+      watchPrinterStatus: watchPrinterStatus,
+      failOnBlockingPrinterStatus: failOnBlockingPrinterStatus,
     );
   }
 
-  /// Cancels a queued job when the platform supports it.
-  static Future<void> cancelPrintJob(String printerAddress, int jobId) {
+  /// Cancels a queued job; returns whether the OS accepted the request.
+  static Future<bool> cancelPrintJob(String printerAddress, int jobId) {
     return FlutterPrintPlatform.instance.cancelPrintJob(printerAddress, jobId);
+  }
+
+  static Future<bool> pausePrintJob(String printerAddress, int jobId) {
+    return FlutterPrintPlatform.instance.pausePrintJob(printerAddress, jobId);
+  }
+
+  static Future<bool> resumePrintJob(String printerAddress, int jobId) {
+    return FlutterPrintPlatform.instance.resumePrintJob(printerAddress, jobId);
+  }
+
+  // 取消打印作业
+  static Future<bool> cancelPrintJobByName(
+    String printerNameOrAddress,
+    int jobId,
+  ) {
+    return job_flow.cancelPrintJobByName(printerNameOrAddress, jobId);
   }
 
   /// iOS-specific extensions. Returns `null` on all other platforms.

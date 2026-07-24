@@ -58,4 +58,28 @@ bool CancelPrintJobOnPrinter(const std::wstring& printer_name, int job_id) {
   return ok != FALSE;
 }
 
+bool PausePrintJobOnPrinter(const std::wstring& printer_name, int job_id) {
+  if (printer_name.empty() || job_id <= 0) return false;
+  HANDLE hPrinter = nullptr;
+  if (!OpenPrinterW(const_cast<LPWSTR>(printer_name.c_str()), &hPrinter, nullptr)) {
+    return false;
+  }
+  const BOOL ok = SetJobW(hPrinter, static_cast<DWORD>(job_id), 0, nullptr,
+                          JOB_CONTROL_PAUSE);
+  ClosePrinter(hPrinter);
+  return ok != FALSE;
+}
+
+bool ResumePrintJobOnPrinter(const std::wstring& printer_name, int job_id) {
+  if (printer_name.empty() || job_id <= 0) return false;
+  HANDLE hPrinter = nullptr;
+  if (!OpenPrinterW(const_cast<LPWSTR>(printer_name.c_str()), &hPrinter, nullptr)) {
+    return false;
+  }
+  const BOOL ok = SetJobW(hPrinter, static_cast<DWORD>(job_id), 0, nullptr,
+                          JOB_CONTROL_RESUME);
+  ClosePrinter(hPrinter);
+  return ok != FALSE;
+}
+
 }  // namespace flutter_print

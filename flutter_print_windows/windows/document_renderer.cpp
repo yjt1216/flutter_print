@@ -149,7 +149,8 @@ static HRESULT GetEncoderClsid(const WCHAR* mimeType, CLSID* pClsid) {
 // ---------------------------------------------------------------------------
 
 std::optional<FlutterError> RenderImageToDC(HDC hdc, const std::wstring& path,
-                                            int copies) {
+                                            int copies,
+                                            const std::wstring& doc_name) {
   EnsureGdiplusInit();
 
   if (copies < 1) copies = 1;
@@ -180,7 +181,7 @@ std::optional<FlutterError> RenderImageToDC(HDC hdc, const std::wstring& path,
 
   DOCINFOW di = {};
   di.cbSize      = sizeof(di);
-  di.lpszDocName = path.c_str();
+  di.lpszDocName = doc_name.c_str();
 
   std::optional<FlutterError> err;
   if (StartDoc(hdc, &di) > 0) {
@@ -259,7 +260,8 @@ static std::optional<FlutterError> DoRenderPdfDoc(HDC hdc, FPDF_DOCUMENT doc,
 }
 
 std::optional<FlutterError> RenderPdfToDC(HDC hdc, const std::wstring& path,
-                                          int copies) {
+                                          int copies,
+                                          const std::wstring& doc_name) {
   EnsurePdfiumInit();
   std::lock_guard<std::mutex> lock(g_pdfium_mtx);
 
@@ -268,7 +270,7 @@ std::optional<FlutterError> RenderPdfToDC(HDC hdc, const std::wstring& path,
   if (!doc)
     return FlutterError("PDF_ERROR", "Cannot open PDF: " + utf8);
 
-  auto err = DoRenderPdfDoc(hdc, doc, path, copies);
+  auto err = DoRenderPdfDoc(hdc, doc, doc_name, copies);
   FPDF_CloseDocument(doc);
   return err;
 }
@@ -335,7 +337,8 @@ std::wstring ReadTextFile(const std::wstring& path) {
 }
 
 std::optional<FlutterError> RenderTextToDC(HDC hdc, const std::wstring& path,
-                                           int copies) {
+                                           int copies,
+                                           const std::wstring& doc_name) {
   if (copies < 1) copies = 1;
   const std::wstring text = DecodeTextBytes(ReadAllBytes(path));
 
@@ -410,7 +413,7 @@ std::optional<FlutterError> RenderTextToDC(HDC hdc, const std::wstring& path,
 
   DOCINFOW di    = {};
   di.cbSize      = sizeof(di);
-  di.lpszDocName = path.c_str();
+  di.lpszDocName = doc_name.c_str();
 
   std::optional<FlutterError> err;
   if (StartDoc(hdc, &di) > 0) {
@@ -445,19 +448,20 @@ std::optional<FlutterError> RenderOrFallback(HDC hdc,
                                               const std::wstring& wPath,
                                               const std::string& mime,
                                               const std::wstring& printerName,
-                                              int copies) {
+                                              int copies,
+                                              const std::wstring& doc_name) {
   if (mime.rfind("image/", 0) == 0) {
-    auto err = RenderImageToDC(hdc, wPath, copies);
+    auto err = RenderImageToDC(hdc, wPath, copies, doc_name);
     DeleteDC(hdc);
     return err;
   }
   if (mime == "application/pdf") {
-    auto err = RenderPdfToDC(hdc, wPath, copies);
+    auto err = RenderPdfToDC(hdc, wPath, copies, doc_name);
     DeleteDC(hdc);
     return err;
   }
   if (mime.rfind("text/", 0) == 0) {
-    auto err = RenderTextToDC(hdc, wPath, copies);
+    auto err = RenderTextToDC(hdc, wPath, copies, doc_name);
     DeleteDC(hdc);
     return err;
   }

@@ -368,11 +368,26 @@ static gpointer list_printers_worker(gpointer user_data) {
       avail_ptr = &avail_val;
     }
 
+    // printer-location for details when set (distinct from make/model).
+    const char* location_str = cupsGetOption("printer-location",
+                                             dests[i].num_options,
+                                             dests[i].options);
+    const gchar* details =
+        (location_str && location_str[0] != '\0') ? location_str : nullptr;
+
+    const char* make_model_str = cupsGetOption("printer-make-and-model",
+                                              dests[i].num_options,
+                                              dests[i].options);
+    const char* device_uri_str = cupsGetOption("device-uri",
+                                               dests[i].num_options,
+                                               dests[i].options);
+
     // Build PrinterInfo — also uses the generated constructor.
     g_autoptr(FlutterPrintPrinterInfo) printer_info =
-        flutter_print_printer_info_new(label, address, nullptr,
+        flutter_print_printer_info_new(label, address, details,
                                        dests[i].is_default != 0, caps,
-                                       avail_ptr);
+                                       avail_ptr, nullptr, nullptr, nullptr,
+                                       nullptr, make_model_str, device_uri_str);
 
     fl_value_append_take(list,
         fl_value_new_custom_object(flutter_print_printer_info_type_id,
@@ -517,7 +532,12 @@ static void handle_print_submit(
                           : nullptr;
   const char* print_path = transcoded ? transcoded : file_path;
 
-  int job_id = cupsPrintFile(dest, print_path, "Flutter Print Job", num_options,
+  const gchar* doc_title =
+      options ? flutter_print_print_options_get_document_title(options) : nullptr;
+  const char* job_name =
+      (doc_title && doc_title[0] != '\0') ? doc_title : "Flutter Print Job";
+
+  int job_id = cupsPrintFile(dest, print_path, job_name, num_options,
                              cups_opts);
   cupsFreeOptions(num_options, cups_opts);
 
@@ -549,15 +569,48 @@ static void handle_cancel_print_job(
                          : cupsGetDefault();
   ipp_status_t status = cupsCancelJob(dest, (int)job_id);
   if (status > IPP_STATUS_OK_EVENTS_COMPLETE) {
-    flutter_print_flutter_print_api_respond_error_cancel_print_job(
-        response_handle, "CANCEL_FAILED", cupsLastErrorString(), nullptr);
+    flutter_print_flutter_print_api_respond_cancel_print_job(
+        response_handle, FALSE);
     return;
   }
-  flutter_print_flutter_print_api_respond_cancel_print_job(response_handle);
+  flutter_print_flutter_print_api_respond_cancel_print_job(response_handle, TRUE);
 #else
-  flutter_print_flutter_print_api_respond_error_cancel_print_job(
-      response_handle, "UNSUPPORTED",
-      "cancelPrintJob requires CUPS at build time", nullptr);
+  flutter_print_flutter_print_api_respond_cancel_print_job(
+      response_handle, FALSE);
+#endif
+}
+
+static void handle_pause_print_job(
+    const gchar* printer_address,
+    int64_t job_id,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+#ifdef HAS_CUPS
+  const char* dest = (printer_address && printer_address[0] != '\0')
+                         ? printer_address
+                         : cupsGetDefault();
+  ipp_status_t status = cupsHoldJob(dest, (int)job_id);
+  flutter_print_flutter_print_api_respond_pause_print_job(
+      response_handle, status <= IPP_STATUS_OK_EVENTS_COMPLETE ? TRUE : FALSE);
+#else
+  flutter_print_flutter_print_api_respond_pause_print_job(response_handle, FALSE);
+#endif
+}
+
+static void handle_resume_print_job(
+    const gchar* printer_address,
+    int64_t job_id,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+#ifdef HAS_CUPS
+  const char* dest = (printer_address && printer_address[0] != '\0')
+                         ? printer_address
+                         : cupsGetDefault();
+  ipp_status_t status = cupsReleaseJob(dest, (int)job_id);
+  flutter_print_flutter_print_api_respond_resume_print_job(
+      response_handle, status <= IPP_STATUS_OK_EVENTS_COMPLETE ? TRUE : FALSE);
+#else
+  flutter_print_flutter_print_api_respond_resume_print_job(response_handle, FALSE);
 #endif
 }
 
@@ -573,6 +626,8 @@ static const FlutterPrintFlutterPrintApiVTable kApiVTable = {
     .list_print_jobs   = handle_list_print_jobs,
     .print_submit      = handle_print_submit,
     .cancel_print_job  = handle_cancel_print_job,
+    .pause_print_job   = handle_pause_print_job,
+    .resume_print_job  = handle_resume_print_job,
 };
 
 void flutter_print_plugin_register_with_registrar(

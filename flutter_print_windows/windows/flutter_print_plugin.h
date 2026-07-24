@@ -43,7 +43,13 @@ class FlutterPrintPlugin : public flutter::Plugin, public FlutterPrintApi {
       std::function<void(ErrorOr<int64_t> reply)> result) override;
   void CancelPrintJob(
       const std::string& printer_address, int64_t job_id,
-      std::function<void(std::optional<FlutterError> reply)> result) override;
+      std::function<void(ErrorOr<bool> reply)> result) override;
+  void PausePrintJob(
+      const std::string& printer_address, int64_t job_id,
+      std::function<void(ErrorOr<bool> reply)> result) override;
+  void ResumePrintJob(
+      const std::string& printer_address, int64_t job_id,
+      std::function<void(ErrorOr<bool> reply)> result) override;
 
   // Windows-specific extras: PDF preview rendering for the Flutter print dialog.
   void HandleWindowsMethod(

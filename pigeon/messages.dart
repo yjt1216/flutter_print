@@ -114,6 +114,7 @@ class PageMargins {
 class PrintOptions {
   const PrintOptions({
     this.printerAddress,
+    this.documentTitle,
     this.pageSize,
     this.margins,
     this.copies,
@@ -131,6 +132,10 @@ class PrintOptions {
   ///   `'ipp://printer.local/ipp/print'`). When provided the job is sent
   ///   directly without showing a dialog.
   final String? printerAddress;
+
+  /// Title shown in the print queue (Windows spooler document name, CUPS job
+  /// title). When `null`, platforms use the file name.
+  final String? documentTitle;
 
   /// Desired output page size.
   ///
@@ -195,6 +200,13 @@ class PrinterCapabilities {
 }
 
 /// Describes a single printer returned by [FlutterPrintApi.listPrinters].
+///
+/// Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+/// metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+/// the physical device or driver when building a **printer profile** (e.g.
+/// which fault-handling rules apply). They do not replace vendor SDK status
+/// codes — combine with [printerStatus], [isAvailable], and print-job status
+/// streams from the main `flutter_print` package.
 class PrinterInfo {
   const PrinterInfo({
     required this.label,
@@ -203,6 +215,12 @@ class PrinterInfo {
     required this.isDefault,
     required this.capabilities,
     this.isAvailable,
+    this.printerStatus,
+    this.driverName,
+    this.portName,
+    this.location,
+    this.makeAndModel,
+    this.deviceUri,
   });
 
   /// Human-readable display name shown to the user (e.g. `'HP LaserJet Pro'`).
@@ -218,8 +236,12 @@ class PrinterInfo {
   /// - **Android** — not set; the user selects the printer inside the dialog.
   final String? address;
 
-  /// Optional longer description provided by the platform (e.g. the printer
-  /// model or location). May be `null`.
+  /// Optional extra text from the platform. Meaning varies by OS:
+  ///
+  /// - **Windows** — driver comment (`pComment`), not the same as [location].
+  /// - **Linux (CUPS)** — often `printer-location` when set.
+  ///
+  /// Prefer [makeAndModel] on CUPS for model identification. May be `null`.
   final String? details;
 
   /// Whether this is the current system-default printer.
@@ -237,6 +259,62 @@ class PrinterInfo {
   ///
   /// Platform support: macOS, Windows, Linux.
   final bool? isAvailable;
+
+  /// Raw printer status from the spooler when the platform exposes it.
+  ///
+  /// **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+  /// helpers exported from the `flutter_print` package (`describePrinterStatus`,
+  /// `isBlockingOsPrinterStatus`, or `printWithStatus` with
+  /// `watchPrinterStatus: true`).
+  ///
+  /// **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+  ///
+  /// Not the same as per-job status — see [PrintJobInfo.rawStatus].
+  final int? printerStatus;
+
+  /// Installed print driver name (Windows queue properties → Driver).
+  ///
+  /// Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+  /// driver for the same device) or to key a driver-based printer profile.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  final String? driverName;
+
+  /// Port the queue is bound to (Windows `pPortName`).
+  ///
+  /// Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+  /// Helps infer **connection type** (USB vs network vs virtual sink).
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  final String? portName;
+
+  /// User-visible location string (Windows `pLocation`), e.g. room or site.
+  ///
+  /// Distinct from [details] on Windows (comment field). On Linux, location
+  /// may appear in [details] instead; [location] stays `null`.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
+  final String? location;
+
+  /// Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+  /// e.g. `KONICA MINOLTA bizhub C458`.
+  ///
+  /// Primary field for **model-based printer profiles** on Linux. On Windows,
+  /// [label] often already contains the model; use [driverName] as a secondary
+  /// key.
+  ///
+  /// **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+  /// added later.
+  final String? makeAndModel;
+
+  /// Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+  /// `usb://Vendor/Model?serial=…`, `socket://…`.
+  ///
+  /// Useful for debugging connectivity and telling IPP/USB/network backends
+  /// apart; not required for normal printing ([address] is the queue name).
+  ///
+  /// **Platform:** Linux (CUPS); `null` elsewhere.
+  final String? deviceUri;
 }
 
 /// A print job in the system queue (Windows Spooler / CUPS / Android PrintJob).
@@ -343,7 +421,15 @@ abstract class FlutterPrintApi {
   @async
   int printSubmit(String filePath, {PrintOptions? options});
 
-  /// Cancels a queued job. Unsupported platforms throw [PlatformException].
+  /// Cancels a queued job. Returns `false` when the OS rejects the operation.
   @async
-  void cancelPrintJob(String printerAddress, int jobId);
+  bool cancelPrintJob(String printerAddress, int jobId);
+
+  /// Pauses a queued job. Returns `false` when unsupported or rejected.
+  @async
+  bool pausePrintJob(String printerAddress, int jobId);
+
+  /// Resumes a paused job. Returns `false` when unsupported or rejected.
+  @async
+  bool resumePrintJob(String printerAddress, int jobId);
 }

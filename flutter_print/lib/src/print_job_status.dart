@@ -2,6 +2,25 @@ import 'dart:io';
 
 import 'package:flutter_print_platform_interface/flutter_print_platform_interface.dart';
 
+/// When to stop [watchPrintJob] / [printWithStatus].
+enum PrintJobCompletionMode {
+  /// Stop when the spooler reports a terminal status while the job is still queued
+  /// (same idea as printing_ffi: `printed`, `completed`, …).
+  spoolerTerminal,
+
+  /// Treat success as **job left the queue** (出队即成功). Status updates are
+  /// emitted while queued; the stream ends when [listPrintJobs] no longer
+  /// contains [jobId]. Hard failures (`error`, `canceled`, `aborted`) still end
+  /// the stream immediately when seen.
+  dequeueSuccess,
+
+  /// Wait for spooler **complete** while the job is still queued (Windows
+  /// `JOB_STATUS_COMPLETE`, CUPS IPP job state `9`), then end the stream.
+  /// If the job **leaves the queue** without that signal (common for virtual
+  /// PDF printers), falls back to the same success handling as [dequeueSuccess].
+  spoolerComplete,
+}
+
 /// Parsed print-job status (see [PrintJobInfo.rawStatus]).
 enum PrintJobStatus {
   pending,
@@ -77,7 +96,13 @@ abstract final class PrintJobStatusHelper {
     return PrintJobStatus.unknown;
   }
 
-  static bool isTerminal(PrintJobStatus status) {
+  static bool isTerminal(
+    PrintJobStatus status, {
+    bool treatRetainedAsSuccess = false,
+  }) {
+    if (treatRetainedAsSuccess && status == PrintJobStatus.retained) {
+      return true;
+    }
     return switch (status) {
       PrintJobStatus.completed ||
       PrintJobStatus.printed ||
@@ -87,6 +112,24 @@ abstract final class PrintJobStatusHelper {
         true,
       _ => false,
     };
+  }
+
+  /// Failure states that should end the stream even in [PrintJobCompletionMode.dequeueSuccess].
+  static bool isFailure(PrintJobStatus status) {
+    return switch (status) {
+      PrintJobStatus.canceled ||
+      PrintJobStatus.aborted ||
+      PrintJobStatus.error =>
+        true,
+      _ => false,
+    };
+  }
+
+  /// Platform-specific "spooler complete" signal while the job is still queued.
+  static bool isSpoolerCompleteRaw(int rawStatus) {
+    if (Platform.isWindows) return (rawStatus & 4096) != 0;
+    if (Platform.isMacOS || Platform.isLinux) return rawStatus == 9;
+    return false;
   }
 }
 

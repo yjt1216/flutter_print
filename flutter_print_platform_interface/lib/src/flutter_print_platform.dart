@@ -70,7 +70,15 @@ abstract class FlutterPrintPlatform extends PlatformInterface {
     throw UnimplementedError('printSubmit() has not been implemented.');
   }
 
-  Future<void> cancelPrintJob(String printerAddress, int jobId) {
+  Future<bool> cancelPrintJob(String printerAddress, int jobId) {
     throw UnimplementedError('cancelPrintJob() has not been implemented.');
+  }
+
+  Future<bool> pausePrintJob(String printerAddress, int jobId) {
+    throw UnimplementedError('pausePrintJob() has not been implemented.');
+  }
+
+  Future<bool> resumePrintJob(String printerAddress, int jobId) {
+    throw UnimplementedError('resumePrintJob() has not been implemented.');
   }
 }

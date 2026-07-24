@@ -4,3 +4,6 @@ export 'src/flutter_print.dart';
 export 'src/paper_sizes.dart';
 export 'src/print_job_monitor.dart';
 export 'src/print_job_status.dart';
+export 'src/print_job_flow.dart';
+export 'src/printer_helpers.dart';
+export 'src/printer_status_helper.dart';

@@ -544,6 +544,7 @@ PrintOptions::PrintOptions() {}
 
 PrintOptions::PrintOptions(
   const std::string* printer_address,
+  const std::string* document_title,
   const PageSize* page_size,
   const PageMargins* margins,
   const int64_t* copies,
@@ -551,6 +552,7 @@ PrintOptions::PrintOptions(
   const bool* color,
   const DuplexMode* duplex_mode)
  : printer_address_(printer_address ? std::optional<std::string>(*printer_address) : std::nullopt),
+    document_title_(document_title ? std::optional<std::string>(*document_title) : std::nullopt),
     page_size_(page_size ? std::make_unique<PageSize>(*page_size) : nullptr),
     margins_(margins ? std::make_unique<PageMargins>(*margins) : nullptr),
     copies_(copies ? std::optional<int64_t>(*copies) : std::nullopt),
@@ -560,6 +562,7 @@ PrintOptions::PrintOptions(
 
 PrintOptions::PrintOptions(const PrintOptions& other)
  : printer_address_(other.printer_address_ ? std::optional<std::string>(*other.printer_address_) : std::nullopt),
+    document_title_(other.document_title_ ? std::optional<std::string>(*other.document_title_) : std::nullopt),
     page_size_(other.page_size_ ? std::make_unique<PageSize>(*other.page_size_) : nullptr),
     margins_(other.margins_ ? std::make_unique<PageMargins>(*other.margins_) : nullptr),
     copies_(other.copies_ ? std::optional<int64_t>(*other.copies_) : std::nullopt),
@@ -569,6 +572,7 @@ PrintOptions::PrintOptions(const PrintOptions& other)
 
 PrintOptions& PrintOptions::operator=(const PrintOptions& other) {
   printer_address_ = other.printer_address_;
+  document_title_ = other.document_title_;
   page_size_ = other.page_size_ ? std::make_unique<PageSize>(*other.page_size_) : nullptr;
   margins_ = other.margins_ ? std::make_unique<PageMargins>(*other.margins_) : nullptr;
   copies_ = other.copies_;
@@ -588,6 +592,19 @@ void PrintOptions::set_printer_address(const std::string_view* value_arg) {
 
 void PrintOptions::set_printer_address(std::string_view value_arg) {
   printer_address_ = value_arg;
+}
+
+
+const std::string* PrintOptions::document_title() const {
+  return document_title_ ? &(*document_title_) : nullptr;
+}
+
+void PrintOptions::set_document_title(const std::string_view* value_arg) {
+  document_title_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrintOptions::set_document_title(std::string_view value_arg) {
+  document_title_ = value_arg;
 }
 
 
@@ -671,8 +688,9 @@ void PrintOptions::set_duplex_mode(const DuplexMode& value_arg) {
 
 EncodableList PrintOptions::ToEncodableList() const {
   EncodableList list;
-  list.reserve(7);
+  list.reserve(8);
   list.push_back(printer_address_ ? EncodableValue(*printer_address_) : EncodableValue());
+  list.push_back(document_title_ ? EncodableValue(*document_title_) : EncodableValue());
   list.push_back(page_size_ ? CustomEncodableValue(*page_size_) : EncodableValue());
   list.push_back(margins_ ? CustomEncodableValue(*margins_) : EncodableValue());
   list.push_back(copies_ ? EncodableValue(*copies_) : EncodableValue());
@@ -688,27 +706,31 @@ PrintOptions PrintOptions::FromEncodableList(const EncodableList& list) {
   if (!encodable_printer_address.IsNull()) {
     decoded.set_printer_address(std::get<std::string>(encodable_printer_address));
   }
-  auto& encodable_page_size = list[1];
+  auto& encodable_document_title = list[1];
+  if (!encodable_document_title.IsNull()) {
+    decoded.set_document_title(std::get<std::string>(encodable_document_title));
+  }
+  auto& encodable_page_size = list[2];
   if (!encodable_page_size.IsNull()) {
     decoded.set_page_size(std::any_cast<const PageSize&>(std::get<CustomEncodableValue>(encodable_page_size)));
   }
-  auto& encodable_margins = list[2];
+  auto& encodable_margins = list[3];
   if (!encodable_margins.IsNull()) {
     decoded.set_margins(std::any_cast<const PageMargins&>(std::get<CustomEncodableValue>(encodable_margins)));
   }
-  auto& encodable_copies = list[3];
+  auto& encodable_copies = list[4];
   if (!encodable_copies.IsNull()) {
     decoded.set_copies(std::get<int64_t>(encodable_copies));
   }
-  auto& encodable_landscape = list[4];
+  auto& encodable_landscape = list[5];
   if (!encodable_landscape.IsNull()) {
     decoded.set_landscape(std::get<bool>(encodable_landscape));
   }
-  auto& encodable_color = list[5];
+  auto& encodable_color = list[6];
   if (!encodable_color.IsNull()) {
     decoded.set_color(std::get<bool>(encodable_color));
   }
-  auto& encodable_duplex_mode = list[6];
+  auto& encodable_duplex_mode = list[7];
   if (!encodable_duplex_mode.IsNull()) {
     decoded.set_duplex_mode(std::any_cast<const DuplexMode&>(std::get<CustomEncodableValue>(encodable_duplex_mode)));
   }
@@ -716,7 +738,7 @@ PrintOptions PrintOptions::FromEncodableList(const EncodableList& list) {
 }
 
 bool PrintOptions::operator==(const PrintOptions& other) const {
-  return PigeonInternalDeepEquals(printer_address_, other.printer_address_) && PigeonInternalDeepEquals(page_size_, other.page_size_) && PigeonInternalDeepEquals(margins_, other.margins_) && PigeonInternalDeepEquals(copies_, other.copies_) && PigeonInternalDeepEquals(landscape_, other.landscape_) && PigeonInternalDeepEquals(color_, other.color_) && PigeonInternalDeepEquals(duplex_mode_, other.duplex_mode_);
+  return PigeonInternalDeepEquals(printer_address_, other.printer_address_) && PigeonInternalDeepEquals(document_title_, other.document_title_) && PigeonInternalDeepEquals(page_size_, other.page_size_) && PigeonInternalDeepEquals(margins_, other.margins_) && PigeonInternalDeepEquals(copies_, other.copies_) && PigeonInternalDeepEquals(landscape_, other.landscape_) && PigeonInternalDeepEquals(color_, other.color_) && PigeonInternalDeepEquals(duplex_mode_, other.duplex_mode_);
 }
 
 bool PrintOptions::operator!=(const PrintOptions& other) const {
@@ -726,6 +748,7 @@ bool PrintOptions::operator!=(const PrintOptions& other) const {
 size_t PrintOptions::Hash() const {
   size_t result = 1;
   result = result * 31 + PigeonInternalDeepHash(printer_address_);
+  result = result * 31 + PigeonInternalDeepHash(document_title_);
   result = result * 31 + PigeonInternalDeepHash(page_size_);
   result = result * 31 + PigeonInternalDeepHash(margins_);
   result = result * 31 + PigeonInternalDeepHash(copies_);
@@ -742,6 +765,13 @@ std::ostream& operator<<(
   os << "printer_address: ";
   if (obj.printer_address_) {
     os << PigeonInternalToString(*obj.printer_address_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", document_title: ";
+  if (obj.document_title_) {
+    os << PigeonInternalToString(*obj.document_title_);
   }
   else {
     os << "null";
@@ -946,13 +976,25 @@ PrinterInfo::PrinterInfo(
   const std::string* details,
   bool is_default,
   const PrinterCapabilities& capabilities,
-  const bool* is_available)
+  const bool* is_available,
+  const int64_t* printer_status,
+  const std::string* driver_name,
+  const std::string* port_name,
+  const std::string* location,
+  const std::string* make_and_model,
+  const std::string* device_uri)
  : label_(label),
     address_(address ? std::optional<std::string>(*address) : std::nullopt),
     details_(details ? std::optional<std::string>(*details) : std::nullopt),
     is_default_(is_default),
     capabilities_(std::make_unique<PrinterCapabilities>(capabilities)),
-    is_available_(is_available ? std::optional<bool>(*is_available) : std::nullopt) {}
+    is_available_(is_available ? std::optional<bool>(*is_available) : std::nullopt),
+    printer_status_(printer_status ? std::optional<int64_t>(*printer_status) : std::nullopt),
+    driver_name_(driver_name ? std::optional<std::string>(*driver_name) : std::nullopt),
+    port_name_(port_name ? std::optional<std::string>(*port_name) : std::nullopt),
+    location_(location ? std::optional<std::string>(*location) : std::nullopt),
+    make_and_model_(make_and_model ? std::optional<std::string>(*make_and_model) : std::nullopt),
+    device_uri_(device_uri ? std::optional<std::string>(*device_uri) : std::nullopt) {}
 
 PrinterInfo::PrinterInfo(const PrinterInfo& other)
  : label_(other.label_),
@@ -960,7 +1002,13 @@ PrinterInfo::PrinterInfo(const PrinterInfo& other)
     details_(other.details_ ? std::optional<std::string>(*other.details_) : std::nullopt),
     is_default_(other.is_default_),
     capabilities_(std::make_unique<PrinterCapabilities>(*other.capabilities_)),
-    is_available_(other.is_available_ ? std::optional<bool>(*other.is_available_) : std::nullopt) {}
+    is_available_(other.is_available_ ? std::optional<bool>(*other.is_available_) : std::nullopt),
+    printer_status_(other.printer_status_ ? std::optional<int64_t>(*other.printer_status_) : std::nullopt),
+    driver_name_(other.driver_name_ ? std::optional<std::string>(*other.driver_name_) : std::nullopt),
+    port_name_(other.port_name_ ? std::optional<std::string>(*other.port_name_) : std::nullopt),
+    location_(other.location_ ? std::optional<std::string>(*other.location_) : std::nullopt),
+    make_and_model_(other.make_and_model_ ? std::optional<std::string>(*other.make_and_model_) : std::nullopt),
+    device_uri_(other.device_uri_ ? std::optional<std::string>(*other.device_uri_) : std::nullopt) {}
 
 PrinterInfo& PrinterInfo::operator=(const PrinterInfo& other) {
   label_ = other.label_;
@@ -969,6 +1017,12 @@ PrinterInfo& PrinterInfo::operator=(const PrinterInfo& other) {
   is_default_ = other.is_default_;
   capabilities_ = std::make_unique<PrinterCapabilities>(*other.capabilities_);
   is_available_ = other.is_available_;
+  printer_status_ = other.printer_status_;
+  driver_name_ = other.driver_name_;
+  port_name_ = other.port_name_;
+  location_ = other.location_;
+  make_and_model_ = other.make_and_model_;
+  device_uri_ = other.device_uri_;
   return *this;
 }
 
@@ -1038,15 +1092,99 @@ void PrinterInfo::set_is_available(bool value_arg) {
 }
 
 
+const int64_t* PrinterInfo::printer_status() const {
+  return printer_status_ ? &(*printer_status_) : nullptr;
+}
+
+void PrinterInfo::set_printer_status(const int64_t* value_arg) {
+  printer_status_ = value_arg ? std::optional<int64_t>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_printer_status(int64_t value_arg) {
+  printer_status_ = value_arg;
+}
+
+
+const std::string* PrinterInfo::driver_name() const {
+  return driver_name_ ? &(*driver_name_) : nullptr;
+}
+
+void PrinterInfo::set_driver_name(const std::string_view* value_arg) {
+  driver_name_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_driver_name(std::string_view value_arg) {
+  driver_name_ = value_arg;
+}
+
+
+const std::string* PrinterInfo::port_name() const {
+  return port_name_ ? &(*port_name_) : nullptr;
+}
+
+void PrinterInfo::set_port_name(const std::string_view* value_arg) {
+  port_name_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_port_name(std::string_view value_arg) {
+  port_name_ = value_arg;
+}
+
+
+const std::string* PrinterInfo::location() const {
+  return location_ ? &(*location_) : nullptr;
+}
+
+void PrinterInfo::set_location(const std::string_view* value_arg) {
+  location_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_location(std::string_view value_arg) {
+  location_ = value_arg;
+}
+
+
+const std::string* PrinterInfo::make_and_model() const {
+  return make_and_model_ ? &(*make_and_model_) : nullptr;
+}
+
+void PrinterInfo::set_make_and_model(const std::string_view* value_arg) {
+  make_and_model_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_make_and_model(std::string_view value_arg) {
+  make_and_model_ = value_arg;
+}
+
+
+const std::string* PrinterInfo::device_uri() const {
+  return device_uri_ ? &(*device_uri_) : nullptr;
+}
+
+void PrinterInfo::set_device_uri(const std::string_view* value_arg) {
+  device_uri_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void PrinterInfo::set_device_uri(std::string_view value_arg) {
+  device_uri_ = value_arg;
+}
+
+
 EncodableList PrinterInfo::ToEncodableList() const {
   EncodableList list;
-  list.reserve(6);
+  list.reserve(12);
   list.push_back(EncodableValue(label_));
   list.push_back(address_ ? EncodableValue(*address_) : EncodableValue());
   list.push_back(details_ ? EncodableValue(*details_) : EncodableValue());
   list.push_back(EncodableValue(is_default_));
   list.push_back(CustomEncodableValue(*capabilities_));
   list.push_back(is_available_ ? EncodableValue(*is_available_) : EncodableValue());
+  list.push_back(printer_status_ ? EncodableValue(*printer_status_) : EncodableValue());
+  list.push_back(driver_name_ ? EncodableValue(*driver_name_) : EncodableValue());
+  list.push_back(port_name_ ? EncodableValue(*port_name_) : EncodableValue());
+  list.push_back(location_ ? EncodableValue(*location_) : EncodableValue());
+  list.push_back(make_and_model_ ? EncodableValue(*make_and_model_) : EncodableValue());
+  list.push_back(device_uri_ ? EncodableValue(*device_uri_) : EncodableValue());
   return list;
 }
 
@@ -1067,11 +1205,35 @@ PrinterInfo PrinterInfo::FromEncodableList(const EncodableList& list) {
   if (!encodable_is_available.IsNull()) {
     decoded.set_is_available(std::get<bool>(encodable_is_available));
   }
+  auto& encodable_printer_status = list[6];
+  if (!encodable_printer_status.IsNull()) {
+    decoded.set_printer_status(std::get<int64_t>(encodable_printer_status));
+  }
+  auto& encodable_driver_name = list[7];
+  if (!encodable_driver_name.IsNull()) {
+    decoded.set_driver_name(std::get<std::string>(encodable_driver_name));
+  }
+  auto& encodable_port_name = list[8];
+  if (!encodable_port_name.IsNull()) {
+    decoded.set_port_name(std::get<std::string>(encodable_port_name));
+  }
+  auto& encodable_location = list[9];
+  if (!encodable_location.IsNull()) {
+    decoded.set_location(std::get<std::string>(encodable_location));
+  }
+  auto& encodable_make_and_model = list[10];
+  if (!encodable_make_and_model.IsNull()) {
+    decoded.set_make_and_model(std::get<std::string>(encodable_make_and_model));
+  }
+  auto& encodable_device_uri = list[11];
+  if (!encodable_device_uri.IsNull()) {
+    decoded.set_device_uri(std::get<std::string>(encodable_device_uri));
+  }
   return decoded;
 }
 
 bool PrinterInfo::operator==(const PrinterInfo& other) const {
-  return PigeonInternalDeepEquals(label_, other.label_) && PigeonInternalDeepEquals(address_, other.address_) && PigeonInternalDeepEquals(details_, other.details_) && PigeonInternalDeepEquals(is_default_, other.is_default_) && PigeonInternalDeepEquals(capabilities_, other.capabilities_) && PigeonInternalDeepEquals(is_available_, other.is_available_);
+  return PigeonInternalDeepEquals(label_, other.label_) && PigeonInternalDeepEquals(address_, other.address_) && PigeonInternalDeepEquals(details_, other.details_) && PigeonInternalDeepEquals(is_default_, other.is_default_) && PigeonInternalDeepEquals(capabilities_, other.capabilities_) && PigeonInternalDeepEquals(is_available_, other.is_available_) && PigeonInternalDeepEquals(printer_status_, other.printer_status_) && PigeonInternalDeepEquals(driver_name_, other.driver_name_) && PigeonInternalDeepEquals(port_name_, other.port_name_) && PigeonInternalDeepEquals(location_, other.location_) && PigeonInternalDeepEquals(make_and_model_, other.make_and_model_) && PigeonInternalDeepEquals(device_uri_, other.device_uri_);
 }
 
 bool PrinterInfo::operator!=(const PrinterInfo& other) const {
@@ -1086,6 +1248,12 @@ size_t PrinterInfo::Hash() const {
   result = result * 31 + PigeonInternalDeepHash(is_default_);
   result = result * 31 + PigeonInternalDeepHash(capabilities_);
   result = result * 31 + PigeonInternalDeepHash(is_available_);
+  result = result * 31 + PigeonInternalDeepHash(printer_status_);
+  result = result * 31 + PigeonInternalDeepHash(driver_name_);
+  result = result * 31 + PigeonInternalDeepHash(port_name_);
+  result = result * 31 + PigeonInternalDeepHash(location_);
+  result = result * 31 + PigeonInternalDeepHash(make_and_model_);
+  result = result * 31 + PigeonInternalDeepHash(device_uri_);
   return result;
 }
 
@@ -1116,6 +1284,48 @@ std::ostream& operator<<(
   os << ", is_available: ";
   if (obj.is_available_) {
     os << PigeonInternalToString(*obj.is_available_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", printer_status: ";
+  if (obj.printer_status_) {
+    os << PigeonInternalToString(*obj.printer_status_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", driver_name: ";
+  if (obj.driver_name_) {
+    os << PigeonInternalToString(*obj.driver_name_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", port_name: ";
+  if (obj.port_name_) {
+    os << PigeonInternalToString(*obj.port_name_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", location: ";
+  if (obj.location_) {
+    os << PigeonInternalToString(*obj.location_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", make_and_model: ";
+  if (obj.make_and_model_) {
+    os << PigeonInternalToString(*obj.make_and_model_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", device_uri: ";
+  if (obj.device_uri_) {
+    os << PigeonInternalToString(*obj.device_uri_);
   }
   else {
     os << "null";
@@ -1510,13 +1720,83 @@ void FlutterPrintApi::SetUp(
             return;
           }
           const int64_t job_id_arg = encodable_job_id_arg.LongValue();
-          api->CancelPrintJob(printer_address_arg, job_id_arg, [reply](std::optional<FlutterError>&& output) {
-            if (output.has_value()) {
-              reply(WrapError(output.value()));
+          api->CancelPrintJob(printer_address_arg, job_id_arg, [reply](ErrorOr<bool>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
               return;
             }
             EncodableList wrapped;
-            wrapped.push_back(EncodableValue());
+            wrapped.push_back(EncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
+        } catch (const std::exception& exception) {
+          reply(WrapError(exception.what()));
+        }
+      });
+    } else {
+      channel.SetMessageHandler(nullptr);
+    }
+  }
+  {
+    BasicMessageChannel<> channel(binary_messenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob" + prepended_suffix, &GetCodec());
+    if (api != nullptr) {
+      channel.SetMessageHandler([api](const EncodableValue& message, const ::flutter::MessageReply<EncodableValue>& reply) {
+        try {
+          const auto& args = std::get<EncodableList>(message);
+          const auto& encodable_printer_address_arg = args.at(0);
+          if (encodable_printer_address_arg.IsNull()) {
+            reply(WrapError("printer_address_arg unexpectedly null."));
+            return;
+          }
+          const auto& printer_address_arg = std::get<std::string>(encodable_printer_address_arg);
+          const auto& encodable_job_id_arg = args.at(1);
+          if (encodable_job_id_arg.IsNull()) {
+            reply(WrapError("job_id_arg unexpectedly null."));
+            return;
+          }
+          const int64_t job_id_arg = encodable_job_id_arg.LongValue();
+          api->PausePrintJob(printer_address_arg, job_id_arg, [reply](ErrorOr<bool>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
+        } catch (const std::exception& exception) {
+          reply(WrapError(exception.what()));
+        }
+      });
+    } else {
+      channel.SetMessageHandler(nullptr);
+    }
+  }
+  {
+    BasicMessageChannel<> channel(binary_messenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob" + prepended_suffix, &GetCodec());
+    if (api != nullptr) {
+      channel.SetMessageHandler([api](const EncodableValue& message, const ::flutter::MessageReply<EncodableValue>& reply) {
+        try {
+          const auto& args = std::get<EncodableList>(message);
+          const auto& encodable_printer_address_arg = args.at(0);
+          if (encodable_printer_address_arg.IsNull()) {
+            reply(WrapError("printer_address_arg unexpectedly null."));
+            return;
+          }
+          const auto& printer_address_arg = std::get<std::string>(encodable_printer_address_arg);
+          const auto& encodable_job_id_arg = args.at(1);
+          if (encodable_job_id_arg.IsNull()) {
+            reply(WrapError("job_id_arg unexpectedly null."));
+            return;
+          }
+          const int64_t job_id_arg = encodable_job_id_arg.LongValue();
+          api->ResumePrintJob(printer_address_arg, job_id_arg, [reply](ErrorOr<bool>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue(std::move(output).TakeValue()));
             reply(EncodableValue(std::move(wrapped)));
           });
         } catch (const std::exception& exception) {

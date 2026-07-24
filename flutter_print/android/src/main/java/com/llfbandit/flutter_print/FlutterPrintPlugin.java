@@ -184,19 +184,25 @@ public class FlutterPrintPlugin
 
   @Override
   public void cancelPrintJob(@NonNull String printerAddress, @NonNull Long jobId,
-                             @NonNull Messages.VoidResult result) {
+                             @NonNull Messages.Result<Boolean> result) {
     TrackedPrintJob tracked = trackedJobs.get(jobId);
     if (tracked == null) {
-      result.error(new Messages.FlutterError(
-          "JOB_NOT_FOUND", "No tracked print job with id " + jobId, null));
+      result.success(false);
       return;
     }
-    if (tracked.job.cancel()) {
-      result.success();
-    } else {
-      result.error(new Messages.FlutterError(
-          "CANCEL_FAILED", "Could not cancel print job " + jobId, null));
-    }
+    result.success(tracked.job.cancel());
+  }
+
+  @Override
+  public void pausePrintJob(@NonNull String printerAddress, @NonNull Long jobId,
+                            @NonNull Messages.Result<Boolean> result) {
+    result.success(false);
+  }
+
+  @Override
+  public void resumePrintJob(@NonNull String printerAddress, @NonNull Long jobId,
+                             @NonNull Messages.Result<Boolean> result) {
+    result.success(false);
   }
 
   private static int androidRawStatus(@NonNull PrintJob job) {

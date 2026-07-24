@@ -241,6 +241,7 @@ G_DECLARE_FINAL_TYPE(FlutterPrintPrintOptions, flutter_print_print_options, FLUT
 /**
  * flutter_print_print_options_new:
  * printer_address: field in this object.
+ * document_title: field in this object.
  * page_size: field in this object.
  * margins: field in this object.
  * copies: field in this object.
@@ -252,7 +253,7 @@ G_DECLARE_FINAL_TYPE(FlutterPrintPrintOptions, flutter_print_print_options, FLUT
  *
  * Returns: a new #FlutterPrintPrintOptions
  */
-FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode);
+FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_address, const gchar* document_title, FlutterPrintPageSize* page_size, FlutterPrintPageMargins* margins, int64_t* copies, gboolean* landscape, gboolean* color, FlutterPrintDuplexMode* duplex_mode);
 
 /**
  * flutter_print_print_options_get_printer_address
@@ -270,6 +271,17 @@ FlutterPrintPrintOptions* flutter_print_print_options_new(const gchar* printer_a
  * Returns: the field value.
  */
 const gchar* flutter_print_print_options_get_printer_address(FlutterPrintPrintOptions* object);
+
+/**
+ * flutter_print_print_options_get_document_title
+ * @object: a #FlutterPrintPrintOptions.
+ *
+ * Title shown in the print queue (Windows spooler document name, CUPS job
+ * title). When `null`, platforms use the file name.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_print_options_get_document_title(FlutterPrintPrintOptions* object);
 
 /**
  * flutter_print_print_options_get_page_size
@@ -479,6 +491,13 @@ gchar* flutter_print_printer_capabilities_to_string(FlutterPrintPrinterCapabilit
  * FlutterPrintPrinterInfo:
  *
  * Describes a single printer returned by [FlutterPrintApi.listPrinters].
+ *
+ * Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+ * metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+ * the physical device or driver when building a **printer profile** (e.g.
+ * which fault-handling rules apply). They do not replace vendor SDK status
+ * codes — combine with [printerStatus], [isAvailable], and print-job status
+ * streams from the main `flutter_print` package.
  */
 
 G_DECLARE_FINAL_TYPE(FlutterPrintPrinterInfo, flutter_print_printer_info, FLUTTER_PRINT, PRINTER_INFO, GObject)
@@ -491,12 +510,18 @@ G_DECLARE_FINAL_TYPE(FlutterPrintPrinterInfo, flutter_print_printer_info, FLUTTE
  * is_default: field in this object.
  * capabilities: field in this object.
  * is_available: field in this object.
+ * printer_status: field in this object.
+ * driver_name: field in this object.
+ * port_name: field in this object.
+ * location: field in this object.
+ * make_and_model: field in this object.
+ * device_uri: field in this object.
  *
  * Creates a new #PrinterInfo object.
  *
  * Returns: a new #FlutterPrintPrinterInfo
  */
-FlutterPrintPrinterInfo* flutter_print_printer_info_new(const gchar* label, const gchar* address, const gchar* details, gboolean is_default, FlutterPrintPrinterCapabilities* capabilities, gboolean* is_available);
+FlutterPrintPrinterInfo* flutter_print_printer_info_new(const gchar* label, const gchar* address, const gchar* details, gboolean is_default, FlutterPrintPrinterCapabilities* capabilities, gboolean* is_available, int64_t* printer_status, const gchar* driver_name, const gchar* port_name, const gchar* location, const gchar* make_and_model, const gchar* device_uri);
 
 /**
  * flutter_print_printer_info_get_label
@@ -529,8 +554,12 @@ const gchar* flutter_print_printer_info_get_address(FlutterPrintPrinterInfo* obj
  * flutter_print_printer_info_get_details
  * @object: a #FlutterPrintPrinterInfo.
  *
- * Optional longer description provided by the platform (e.g. the printer
- * model or location). May be `null`.
+ * Optional extra text from the platform. Meaning varies by OS:
+ *
+ * - **Windows** — driver comment (`pComment`), not the same as [location].
+ * - **Linux (CUPS)** — often `printer-location` when set.
+ *
+ * Prefer [makeAndModel] on CUPS for model identification. May be `null`.
  *
  * Returns: the field value.
  */
@@ -572,6 +601,104 @@ FlutterPrintPrinterCapabilities* flutter_print_printer_info_get_capabilities(Flu
  * Returns: the field value.
  */
 gboolean* flutter_print_printer_info_get_is_available(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_printer_status
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * Raw printer status from the spooler when the platform exposes it.
+ *
+ * **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+ * helpers exported from the `flutter_print` package (`describePrinterStatus`,
+ * `isBlockingOsPrinterStatus`, or `printWithStatus` with
+ * `watchPrinterStatus: true`).
+ *
+ * **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+ *
+ * Not the same as per-job status — see [PrintJobInfo.rawStatus].
+ *
+ * Returns: the field value.
+ */
+int64_t* flutter_print_printer_info_get_printer_status(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_driver_name
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * Installed print driver name (Windows queue properties → Driver).
+ *
+ * Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+ * driver for the same device) or to key a driver-based printer profile.
+ *
+ * **Platform:** Windows only; `null` elsewhere.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_printer_info_get_driver_name(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_port_name
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * Port the queue is bound to (Windows `pPortName`).
+ *
+ * Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+ * Helps infer **connection type** (USB vs network vs virtual sink).
+ *
+ * **Platform:** Windows only; `null` elsewhere.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_printer_info_get_port_name(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_location
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * User-visible location string (Windows `pLocation`), e.g. room or site.
+ *
+ * Distinct from [details] on Windows (comment field). On Linux, location
+ * may appear in [details] instead; [location] stays `null`.
+ *
+ * **Platform:** Windows only; `null` elsewhere.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_printer_info_get_location(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_make_and_model
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+ * e.g. `KONICA MINOLTA bizhub C458`.
+ *
+ * Primary field for **model-based printer profiles** on Linux. On Windows,
+ * [label] often already contains the model; use [driverName] as a secondary
+ * key.
+ *
+ * **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+ * added later.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_printer_info_get_make_and_model(FlutterPrintPrinterInfo* object);
+
+/**
+ * flutter_print_printer_info_get_device_uri
+ * @object: a #FlutterPrintPrinterInfo.
+ *
+ * Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+ * `usb://Vendor/Model?serial=…`, `socket://…`.
+ *
+ * Useful for debugging connectivity and telling IPP/USB/network backends
+ * apart; not required for normal printing ([address] is the queue name).
+ *
+ * **Platform:** Linux (CUPS); `null` elsewhere.
+ *
+ * Returns: the field value.
+ */
+const gchar* flutter_print_printer_info_get_device_uri(FlutterPrintPrinterInfo* object);
 
 /**
  * flutter_print_printer_info_equals:
@@ -722,6 +849,8 @@ typedef struct {
   void (*list_print_jobs)(const gchar* printer_address, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*print_submit)(const gchar* file_path, FlutterPrintPrintOptions* options, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*cancel_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
+  void (*pause_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
+  void (*resume_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
 } FlutterPrintFlutterPrintApiVTable;
 
 /**
@@ -868,10 +997,11 @@ void flutter_print_flutter_print_api_respond_error_print_submit(FlutterPrintFlut
 /**
  * flutter_print_flutter_print_api_respond_cancel_print_job:
  * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
  *
  * Responds to FlutterPrintApi.cancelPrintJob. 
  */
-void flutter_print_flutter_print_api_respond_cancel_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle);
+void flutter_print_flutter_print_api_respond_cancel_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value);
 
 /**
  * flutter_print_flutter_print_api_respond_error_cancel_print_job:
@@ -883,6 +1013,46 @@ void flutter_print_flutter_print_api_respond_cancel_print_job(FlutterPrintFlutte
  * Responds with an error to FlutterPrintApi.cancelPrintJob. 
  */
 void flutter_print_flutter_print_api_respond_error_cancel_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * flutter_print_flutter_print_api_respond_pause_print_job:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to FlutterPrintApi.pausePrintJob. 
+ */
+void flutter_print_flutter_print_api_respond_pause_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value);
+
+/**
+ * flutter_print_flutter_print_api_respond_error_pause_print_job:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to FlutterPrintApi.pausePrintJob. 
+ */
+void flutter_print_flutter_print_api_respond_error_pause_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * flutter_print_flutter_print_api_respond_resume_print_job:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to FlutterPrintApi.resumePrintJob. 
+ */
+void flutter_print_flutter_print_api_respond_resume_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value);
+
+/**
+ * flutter_print_flutter_print_api_respond_error_resume_print_job:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to FlutterPrintApi.resumePrintJob. 
+ */
+void flutter_print_flutter_print_api_respond_error_resume_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
 
 G_END_DECLS
 

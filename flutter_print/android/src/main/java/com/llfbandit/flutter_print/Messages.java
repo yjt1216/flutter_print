@@ -564,6 +564,20 @@ public class Messages {
     }
 
     /**
+     * Title shown in the print queue (Windows spooler document name, CUPS job
+     * title). When `null`, platforms use the file name.
+     */
+    private @Nullable String documentTitle;
+
+    public @Nullable String getDocumentTitle() {
+      return documentTitle;
+    }
+
+    public void setDocumentTitle(@Nullable String setterArg) {
+      this.documentTitle = setterArg;
+    }
+
+    /**
      * Desired output page size.
      *
      * Platform support: Android, macOS, Linux (named sizes only), Windows
@@ -662,18 +676,18 @@ public class Messages {
       if (this == o) { return true; }
       if (o == null || getClass() != o.getClass()) { return false; }
       PrintOptions that = (PrintOptions) o;
-      return pigeonDeepEquals(printerAddress, that.printerAddress) && pigeonDeepEquals(pageSize, that.pageSize) && pigeonDeepEquals(margins, that.margins) && pigeonDeepEquals(copies, that.copies) && pigeonDeepEquals(landscape, that.landscape) && pigeonDeepEquals(color, that.color) && pigeonDeepEquals(duplexMode, that.duplexMode);
+      return pigeonDeepEquals(printerAddress, that.printerAddress) && pigeonDeepEquals(documentTitle, that.documentTitle) && pigeonDeepEquals(pageSize, that.pageSize) && pigeonDeepEquals(margins, that.margins) && pigeonDeepEquals(copies, that.copies) && pigeonDeepEquals(landscape, that.landscape) && pigeonDeepEquals(color, that.color) && pigeonDeepEquals(duplexMode, that.duplexMode);
     }
 
     @Override
     public int hashCode() {
-      Object[] fields = new Object[] {getClass(), printerAddress, pageSize, margins, copies, landscape, color, duplexMode};
+      Object[] fields = new Object[] {getClass(), printerAddress, documentTitle, pageSize, margins, copies, landscape, color, duplexMode};
       return pigeonDeepHashCode(fields);
     }
 
     @Override
     public String toString() {
-      return "PrintOptions{" + "printerAddress=" + printerAddress + ", " + "pageSize=" + pageSize + ", " + "margins=" + margins + ", " + "copies=" + copies + ", " + "landscape=" + landscape + ", " + "color=" + color + ", " + "duplexMode=" + duplexMode + "}";
+      return "PrintOptions{" + "printerAddress=" + printerAddress + ", " + "documentTitle=" + documentTitle + ", " + "pageSize=" + pageSize + ", " + "margins=" + margins + ", " + "copies=" + copies + ", " + "landscape=" + landscape + ", " + "color=" + color + ", " + "duplexMode=" + duplexMode + "}";
     }
 
     public static final class Builder {
@@ -683,6 +697,14 @@ public class Messages {
       @CanIgnoreReturnValue
       public @NonNull Builder setPrinterAddress(@Nullable String setterArg) {
         this.printerAddress = setterArg;
+        return this;
+      }
+
+      private @Nullable String documentTitle;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setDocumentTitle(@Nullable String setterArg) {
+        this.documentTitle = setterArg;
         return this;
       }
 
@@ -737,6 +759,7 @@ public class Messages {
       public @NonNull PrintOptions build() {
         PrintOptions pigeonReturn = new PrintOptions();
         pigeonReturn.setPrinterAddress(printerAddress);
+        pigeonReturn.setDocumentTitle(documentTitle);
         pigeonReturn.setPageSize(pageSize);
         pigeonReturn.setMargins(margins);
         pigeonReturn.setCopies(copies);
@@ -749,8 +772,9 @@ public class Messages {
 
     @NonNull
     ArrayList<Object> toList() {
-      ArrayList<Object> toListResult = new ArrayList<>(7);
+      ArrayList<Object> toListResult = new ArrayList<>(8);
       toListResult.add(printerAddress);
+      toListResult.add(documentTitle);
       toListResult.add(pageSize);
       toListResult.add(margins);
       toListResult.add(copies);
@@ -764,17 +788,19 @@ public class Messages {
       PrintOptions pigeonResult = new PrintOptions();
       Object printerAddress = pigeonVar_list.get(0);
       pigeonResult.setPrinterAddress((String) printerAddress);
-      Object pageSize = pigeonVar_list.get(1);
+      Object documentTitle = pigeonVar_list.get(1);
+      pigeonResult.setDocumentTitle((String) documentTitle);
+      Object pageSize = pigeonVar_list.get(2);
       pigeonResult.setPageSize((PageSize) pageSize);
-      Object margins = pigeonVar_list.get(2);
+      Object margins = pigeonVar_list.get(3);
       pigeonResult.setMargins((PageMargins) margins);
-      Object copies = pigeonVar_list.get(3);
+      Object copies = pigeonVar_list.get(4);
       pigeonResult.setCopies((Long) copies);
-      Object landscape = pigeonVar_list.get(4);
+      Object landscape = pigeonVar_list.get(5);
       pigeonResult.setLandscape((Boolean) landscape);
-      Object color = pigeonVar_list.get(5);
+      Object color = pigeonVar_list.get(6);
       pigeonResult.setColor((Boolean) color);
-      Object duplexMode = pigeonVar_list.get(6);
+      Object duplexMode = pigeonVar_list.get(7);
       pigeonResult.setDuplexMode((DuplexMode) duplexMode);
       return pigeonResult;
     }
@@ -940,6 +966,13 @@ public class Messages {
   /**
    * Describes a single printer returned by [FlutterPrintApi.listPrinters].
    *
+   * Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+   * metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+   * the physical device or driver when building a **printer profile** (e.g.
+   * which fault-handling rules apply). They do not replace vendor SDK status
+   * codes — combine with [printerStatus], [isAvailable], and print-job status
+   * streams from the main `flutter_print` package.
+   *
    * Generated class from Pigeon that represents data sent in messages.
    */
   public static final class PrinterInfo {
@@ -978,8 +1011,12 @@ public class Messages {
     }
 
     /**
-     * Optional longer description provided by the platform (e.g. the printer
-     * model or location). May be `null`.
+     * Optional extra text from the platform. Meaning varies by OS:
+     *
+     * - **Windows** — driver comment (`pComment`), not the same as [location].
+     * - **Linux (CUPS)** — often `printer-location` when set.
+     *
+     * Prefer [makeAndModel] on CUPS for model identification. May be `null`.
      */
     private @Nullable String details;
 
@@ -1039,6 +1076,122 @@ public class Messages {
       this.isAvailable = setterArg;
     }
 
+    /**
+     * Raw printer status from the spooler when the platform exposes it.
+     *
+     * **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+     * helpers exported from the `flutter_print` package (`describePrinterStatus`,
+     * `isBlockingOsPrinterStatus`, or `printWithStatus` with
+     * `watchPrinterStatus: true`).
+     *
+     * **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+     *
+     * Not the same as per-job status — see [PrintJobInfo.rawStatus].
+     */
+    private @Nullable Long printerStatus;
+
+    public @Nullable Long getPrinterStatus() {
+      return printerStatus;
+    }
+
+    public void setPrinterStatus(@Nullable Long setterArg) {
+      this.printerStatus = setterArg;
+    }
+
+    /**
+     * Installed print driver name (Windows queue properties → Driver).
+     *
+     * Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+     * driver for the same device) or to key a driver-based printer profile.
+     *
+     * **Platform:** Windows only; `null` elsewhere.
+     */
+    private @Nullable String driverName;
+
+    public @Nullable String getDriverName() {
+      return driverName;
+    }
+
+    public void setDriverName(@Nullable String setterArg) {
+      this.driverName = setterArg;
+    }
+
+    /**
+     * Port the queue is bound to (Windows `pPortName`).
+     *
+     * Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+     * Helps infer **connection type** (USB vs network vs virtual sink).
+     *
+     * **Platform:** Windows only; `null` elsewhere.
+     */
+    private @Nullable String portName;
+
+    public @Nullable String getPortName() {
+      return portName;
+    }
+
+    public void setPortName(@Nullable String setterArg) {
+      this.portName = setterArg;
+    }
+
+    /**
+     * User-visible location string (Windows `pLocation`), e.g. room or site.
+     *
+     * Distinct from [details] on Windows (comment field). On Linux, location
+     * may appear in [details] instead; [location] stays `null`.
+     *
+     * **Platform:** Windows only; `null` elsewhere.
+     */
+    private @Nullable String location;
+
+    public @Nullable String getLocation() {
+      return location;
+    }
+
+    public void setLocation(@Nullable String setterArg) {
+      this.location = setterArg;
+    }
+
+    /**
+     * Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+     * e.g. `KONICA MINOLTA bizhub C458`.
+     *
+     * Primary field for **model-based printer profiles** on Linux. On Windows,
+     * [label] often already contains the model; use [driverName] as a secondary
+     * key.
+     *
+     * **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+     * added later.
+     */
+    private @Nullable String makeAndModel;
+
+    public @Nullable String getMakeAndModel() {
+      return makeAndModel;
+    }
+
+    public void setMakeAndModel(@Nullable String setterArg) {
+      this.makeAndModel = setterArg;
+    }
+
+    /**
+     * Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+     * `usb://Vendor/Model?serial=…`, `socket://…`.
+     *
+     * Useful for debugging connectivity and telling IPP/USB/network backends
+     * apart; not required for normal printing ([address] is the queue name).
+     *
+     * **Platform:** Linux (CUPS); `null` elsewhere.
+     */
+    private @Nullable String deviceUri;
+
+    public @Nullable String getDeviceUri() {
+      return deviceUri;
+    }
+
+    public void setDeviceUri(@Nullable String setterArg) {
+      this.deviceUri = setterArg;
+    }
+
     /** Constructor is non-public to enforce null safety; use Builder. */
     PrinterInfo() {}
 
@@ -1047,18 +1200,18 @@ public class Messages {
       if (this == o) { return true; }
       if (o == null || getClass() != o.getClass()) { return false; }
       PrinterInfo that = (PrinterInfo) o;
-      return pigeonDeepEquals(label, that.label) && pigeonDeepEquals(address, that.address) && pigeonDeepEquals(details, that.details) && pigeonDeepEquals(isDefault, that.isDefault) && pigeonDeepEquals(capabilities, that.capabilities) && pigeonDeepEquals(isAvailable, that.isAvailable);
+      return pigeonDeepEquals(label, that.label) && pigeonDeepEquals(address, that.address) && pigeonDeepEquals(details, that.details) && pigeonDeepEquals(isDefault, that.isDefault) && pigeonDeepEquals(capabilities, that.capabilities) && pigeonDeepEquals(isAvailable, that.isAvailable) && pigeonDeepEquals(printerStatus, that.printerStatus) && pigeonDeepEquals(driverName, that.driverName) && pigeonDeepEquals(portName, that.portName) && pigeonDeepEquals(location, that.location) && pigeonDeepEquals(makeAndModel, that.makeAndModel) && pigeonDeepEquals(deviceUri, that.deviceUri);
     }
 
     @Override
     public int hashCode() {
-      Object[] fields = new Object[] {getClass(), label, address, details, isDefault, capabilities, isAvailable};
+      Object[] fields = new Object[] {getClass(), label, address, details, isDefault, capabilities, isAvailable, printerStatus, driverName, portName, location, makeAndModel, deviceUri};
       return pigeonDeepHashCode(fields);
     }
 
     @Override
     public String toString() {
-      return "PrinterInfo{" + "label=" + label + ", " + "address=" + address + ", " + "details=" + details + ", " + "isDefault=" + isDefault + ", " + "capabilities=" + capabilities + ", " + "isAvailable=" + isAvailable + "}";
+      return "PrinterInfo{" + "label=" + label + ", " + "address=" + address + ", " + "details=" + details + ", " + "isDefault=" + isDefault + ", " + "capabilities=" + capabilities + ", " + "isAvailable=" + isAvailable + ", " + "printerStatus=" + printerStatus + ", " + "driverName=" + driverName + ", " + "portName=" + portName + ", " + "location=" + location + ", " + "makeAndModel=" + makeAndModel + ", " + "deviceUri=" + deviceUri + "}";
     }
 
     public static final class Builder {
@@ -1111,6 +1264,54 @@ public class Messages {
         return this;
       }
 
+      private @Nullable Long printerStatus;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setPrinterStatus(@Nullable Long setterArg) {
+        this.printerStatus = setterArg;
+        return this;
+      }
+
+      private @Nullable String driverName;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setDriverName(@Nullable String setterArg) {
+        this.driverName = setterArg;
+        return this;
+      }
+
+      private @Nullable String portName;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setPortName(@Nullable String setterArg) {
+        this.portName = setterArg;
+        return this;
+      }
+
+      private @Nullable String location;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setLocation(@Nullable String setterArg) {
+        this.location = setterArg;
+        return this;
+      }
+
+      private @Nullable String makeAndModel;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setMakeAndModel(@Nullable String setterArg) {
+        this.makeAndModel = setterArg;
+        return this;
+      }
+
+      private @Nullable String deviceUri;
+
+      @CanIgnoreReturnValue
+      public @NonNull Builder setDeviceUri(@Nullable String setterArg) {
+        this.deviceUri = setterArg;
+        return this;
+      }
+
       public @NonNull PrinterInfo build() {
         PrinterInfo pigeonReturn = new PrinterInfo();
         pigeonReturn.setLabel(label);
@@ -1119,19 +1320,31 @@ public class Messages {
         pigeonReturn.setIsDefault(isDefault);
         pigeonReturn.setCapabilities(capabilities);
         pigeonReturn.setIsAvailable(isAvailable);
+        pigeonReturn.setPrinterStatus(printerStatus);
+        pigeonReturn.setDriverName(driverName);
+        pigeonReturn.setPortName(portName);
+        pigeonReturn.setLocation(location);
+        pigeonReturn.setMakeAndModel(makeAndModel);
+        pigeonReturn.setDeviceUri(deviceUri);
         return pigeonReturn;
       }
     }
 
     @NonNull
     ArrayList<Object> toList() {
-      ArrayList<Object> toListResult = new ArrayList<>(6);
+      ArrayList<Object> toListResult = new ArrayList<>(12);
       toListResult.add(label);
       toListResult.add(address);
       toListResult.add(details);
       toListResult.add(isDefault);
       toListResult.add(capabilities);
       toListResult.add(isAvailable);
+      toListResult.add(printerStatus);
+      toListResult.add(driverName);
+      toListResult.add(portName);
+      toListResult.add(location);
+      toListResult.add(makeAndModel);
+      toListResult.add(deviceUri);
       return toListResult;
     }
 
@@ -1149,6 +1362,18 @@ public class Messages {
       pigeonResult.setCapabilities((PrinterCapabilities) capabilities);
       Object isAvailable = pigeonVar_list.get(5);
       pigeonResult.setIsAvailable((Boolean) isAvailable);
+      Object printerStatus = pigeonVar_list.get(6);
+      pigeonResult.setPrinterStatus((Long) printerStatus);
+      Object driverName = pigeonVar_list.get(7);
+      pigeonResult.setDriverName((String) driverName);
+      Object portName = pigeonVar_list.get(8);
+      pigeonResult.setPortName((String) portName);
+      Object location = pigeonVar_list.get(9);
+      pigeonResult.setLocation((String) location);
+      Object makeAndModel = pigeonVar_list.get(10);
+      pigeonResult.setMakeAndModel((String) makeAndModel);
+      Object deviceUri = pigeonVar_list.get(11);
+      pigeonResult.setDeviceUri((String) deviceUri);
       return pigeonResult;
     }
   }
@@ -1454,8 +1679,12 @@ public class Messages {
      * when the user confirms (same as [print] for images with immediate id).
      */
     void printSubmit(@NonNull String filePath, @Nullable PrintOptions options, @NonNull Result<Long> result);
-    /** Cancels a queued job. Unsupported platforms throw [PlatformException]. */
-    void cancelPrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull VoidResult result);
+    /** Cancels a queued job. Returns `false` when the OS rejects the operation. */
+    void cancelPrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull Result<Boolean> result);
+    /** Pauses a queued job. Returns `false` when unsupported or rejected. */
+    void pausePrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull Result<Boolean> result);
+    /** Resumes a paused job. Returns `false` when unsupported or rejected. */
+    void resumePrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull Result<Boolean> result);
 
     /** The codec used by FlutterPrintApi. */
     static @NonNull MessageCodec<Object> getCodec() {
@@ -1651,10 +1880,10 @@ public class Messages {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String printerAddressArg = (String) args.get(0);
                 Long jobIdArg = (Long) args.get(1);
-                VoidResult resultCallback =
-                    new VoidResult() {
-                      public void success() {
-                        wrapped.add(0, null);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
                         reply.reply(wrapped);
                       }
 
@@ -1665,6 +1894,66 @@ public class Messages {
                     };
 
                 api.cancelPrintJob(printerAddressArg, jobIdArg, resultCallback);
+              });
+        } else {
+          channel.setMessageHandler(null);
+        }
+      }
+      {
+        BasicMessageChannel<Object> channel =
+            new BasicMessageChannel<>(
+                binaryMessenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob" + messageChannelSuffix, getCodec());
+        if (api != null) {
+          channel.setMessageHandler(
+              (message, reply) -> {
+                ArrayList<Object> wrapped = new ArrayList<>();
+                ArrayList<Object> args = (ArrayList<Object>) message;
+                String printerAddressArg = (String) args.get(0);
+                Long jobIdArg = (Long) args.get(1);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.pausePrintJob(printerAddressArg, jobIdArg, resultCallback);
+              });
+        } else {
+          channel.setMessageHandler(null);
+        }
+      }
+      {
+        BasicMessageChannel<Object> channel =
+            new BasicMessageChannel<>(
+                binaryMessenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob" + messageChannelSuffix, getCodec());
+        if (api != null) {
+          channel.setMessageHandler(
+              (message, reply) -> {
+                ArrayList<Object> wrapped = new ArrayList<>();
+                ArrayList<Object> args = (ArrayList<Object>) message;
+                String printerAddressArg = (String) args.get(0);
+                Long jobIdArg = (Long) args.get(1);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.resumePrintJob(printerAddressArg, jobIdArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);

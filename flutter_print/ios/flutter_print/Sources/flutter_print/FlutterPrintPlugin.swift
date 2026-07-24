@@ -74,10 +74,18 @@ extension FlutterPrintPlugin: FlutterPrintApi {
   }
 
   func cancelPrintJob(printerAddress: String, jobId: Int64,
-                      completion: @escaping (Result<Void, any Error>) -> Void) {
-    completion(.failure(PigeonError(code: "UNSUPPORTED",
-                                    message: "cancelPrintJob is not supported on iOS",
-                                    details: nil)))
+                      completion: @escaping (Result<Bool, any Error>) -> Void) {
+    completion(.success(false))
+  }
+
+  func pausePrintJob(printerAddress: String, jobId: Int64,
+                     completion: @escaping (Result<Bool, any Error>) -> Void) {
+    completion(.success(false))
+  }
+
+  func resumePrintJob(printerAddress: String, jobId: Int64,
+                      completion: @escaping (Result<Bool, any Error>) -> Void) {
+    completion(.success(false))
   }
 }
 

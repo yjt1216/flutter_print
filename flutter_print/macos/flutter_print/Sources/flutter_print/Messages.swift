@@ -337,6 +337,9 @@ struct PrintOptions: Hashable, CustomStringConvertible {
   ///   `'ipp://printer.local/ipp/print'`). When provided the job is sent
   ///   directly without showing a dialog.
   var printerAddress: String? = nil
+  /// Title shown in the print queue (Windows spooler document name, CUPS job
+  /// title). When `null`, platforms use the file name.
+  var documentTitle: String? = nil
   /// Desired output page size.
   ///
   /// Platform support: Android, macOS, Linux (named sizes only), Windows
@@ -370,15 +373,17 @@ struct PrintOptions: Hashable, CustomStringConvertible {
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> PrintOptions? {
     let printerAddress: String? = nilOrValue(pigeonVar_list[0])
-    let pageSize: PageSize? = nilOrValue(pigeonVar_list[1])
-    let margins: PageMargins? = nilOrValue(pigeonVar_list[2])
-    let copies: Int64? = nilOrValue(pigeonVar_list[3])
-    let landscape: Bool? = nilOrValue(pigeonVar_list[4])
-    let color: Bool? = nilOrValue(pigeonVar_list[5])
-    let duplexMode: DuplexMode? = nilOrValue(pigeonVar_list[6])
+    let documentTitle: String? = nilOrValue(pigeonVar_list[1])
+    let pageSize: PageSize? = nilOrValue(pigeonVar_list[2])
+    let margins: PageMargins? = nilOrValue(pigeonVar_list[3])
+    let copies: Int64? = nilOrValue(pigeonVar_list[4])
+    let landscape: Bool? = nilOrValue(pigeonVar_list[5])
+    let color: Bool? = nilOrValue(pigeonVar_list[6])
+    let duplexMode: DuplexMode? = nilOrValue(pigeonVar_list[7])
 
     return PrintOptions(
       printerAddress: printerAddress,
+      documentTitle: documentTitle,
       pageSize: pageSize,
       margins: margins,
       copies: copies,
@@ -390,6 +395,7 @@ struct PrintOptions: Hashable, CustomStringConvertible {
   func toList() -> [Any?] {
     return [
       printerAddress,
+      documentTitle,
       pageSize,
       margins,
       copies,
@@ -402,12 +408,13 @@ struct PrintOptions: Hashable, CustomStringConvertible {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.printerAddress, rhs.printerAddress) && MessagesPigeonInternal.deepEquals(lhs.pageSize, rhs.pageSize) && MessagesPigeonInternal.deepEquals(lhs.margins, rhs.margins) && MessagesPigeonInternal.deepEquals(lhs.copies, rhs.copies) && MessagesPigeonInternal.deepEquals(lhs.landscape, rhs.landscape) && MessagesPigeonInternal.deepEquals(lhs.color, rhs.color) && MessagesPigeonInternal.deepEquals(lhs.duplexMode, rhs.duplexMode)
+    return MessagesPigeonInternal.deepEquals(lhs.printerAddress, rhs.printerAddress) && MessagesPigeonInternal.deepEquals(lhs.documentTitle, rhs.documentTitle) && MessagesPigeonInternal.deepEquals(lhs.pageSize, rhs.pageSize) && MessagesPigeonInternal.deepEquals(lhs.margins, rhs.margins) && MessagesPigeonInternal.deepEquals(lhs.copies, rhs.copies) && MessagesPigeonInternal.deepEquals(lhs.landscape, rhs.landscape) && MessagesPigeonInternal.deepEquals(lhs.color, rhs.color) && MessagesPigeonInternal.deepEquals(lhs.duplexMode, rhs.duplexMode)
   }
 
   func hash(into hasher: inout Hasher) {
     hasher.combine("PrintOptions")
     MessagesPigeonInternal.deepHash(value: printerAddress, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: documentTitle, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: pageSize, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: margins, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: copies, hasher: &hasher)
@@ -417,7 +424,7 @@ struct PrintOptions: Hashable, CustomStringConvertible {
   }
 
   public var description: String {
-    return "PrintOptions(printerAddress: \(String(describing: printerAddress)), pageSize: \(String(describing: pageSize)), margins: \(String(describing: margins)), copies: \(String(describing: copies)), landscape: \(String(describing: landscape)), color: \(String(describing: color)), duplexMode: \(String(describing: duplexMode)))"
+    return "PrintOptions(printerAddress: \(String(describing: printerAddress)), documentTitle: \(String(describing: documentTitle)), pageSize: \(String(describing: pageSize)), margins: \(String(describing: margins)), copies: \(String(describing: copies)), landscape: \(String(describing: landscape)), color: \(String(describing: color)), duplexMode: \(String(describing: duplexMode)))"
   }
 }
 
@@ -513,6 +520,23 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
   ///
   /// Platform support: macOS, Windows, Linux.
   var isAvailable: Bool? = nil
+  /// Raw platform printer status when available (Windows `PRINTER_STATUS_*`
+  /// bit mask). Parse for offline/paper-out etc. `null` when not reported.
+  var printerStatus: Int64? = nil
+  /// Installed driver name (Windows `pDriverName`). `null` when not reported.
+  var driverName: String? = nil
+  /// Connection port (Windows `pPortName`, e.g. `USB001`, `WSD-…`). `null`
+  /// when not reported.
+  var portName: String? = nil
+  /// Physical location string (Windows `pLocation`). Distinct from [details]
+  /// (often driver comment on Windows). `null` when not reported.
+  var location: String? = nil
+  /// Manufacturer/model string (CUPS `printer-make-and-model`). `null` when
+  /// not reported.
+  var makeAndModel: String? = nil
+  /// Device URI (CUPS `device-uri`, e.g. `ipp://…`, `usb://…`). `null` when
+  /// not reported.
+  var deviceUri: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -523,6 +547,12 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
     let isDefault = pigeonVar_list[3] as! Bool
     let capabilities = pigeonVar_list[4] as! PrinterCapabilities
     let isAvailable: Bool? = nilOrValue(pigeonVar_list[5])
+    let printerStatus: Int64? = nilOrValue(pigeonVar_list[6])
+    let driverName: String? = nilOrValue(pigeonVar_list[7])
+    let portName: String? = nilOrValue(pigeonVar_list[8])
+    let location: String? = nilOrValue(pigeonVar_list[9])
+    let makeAndModel: String? = nilOrValue(pigeonVar_list[10])
+    let deviceUri: String? = nilOrValue(pigeonVar_list[11])
 
     return PrinterInfo(
       label: label,
@@ -530,7 +560,13 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
       details: details,
       isDefault: isDefault,
       capabilities: capabilities,
-      isAvailable: isAvailable
+      isAvailable: isAvailable,
+      printerStatus: printerStatus,
+      driverName: driverName,
+      portName: portName,
+      location: location,
+      makeAndModel: makeAndModel,
+      deviceUri: deviceUri
     )
   }
   func toList() -> [Any?] {
@@ -541,13 +577,19 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
       isDefault,
       capabilities,
       isAvailable,
+      printerStatus,
+      driverName,
+      portName,
+      location,
+      makeAndModel,
+      deviceUri,
     ]
   }
   static func == (lhs: PrinterInfo, rhs: PrinterInfo) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.label, rhs.label) && MessagesPigeonInternal.deepEquals(lhs.address, rhs.address) && MessagesPigeonInternal.deepEquals(lhs.details, rhs.details) && MessagesPigeonInternal.deepEquals(lhs.isDefault, rhs.isDefault) && MessagesPigeonInternal.deepEquals(lhs.capabilities, rhs.capabilities) && MessagesPigeonInternal.deepEquals(lhs.isAvailable, rhs.isAvailable)
+    return MessagesPigeonInternal.deepEquals(lhs.label, rhs.label) && MessagesPigeonInternal.deepEquals(lhs.address, rhs.address) && MessagesPigeonInternal.deepEquals(lhs.details, rhs.details) && MessagesPigeonInternal.deepEquals(lhs.isDefault, rhs.isDefault) && MessagesPigeonInternal.deepEquals(lhs.capabilities, rhs.capabilities) && MessagesPigeonInternal.deepEquals(lhs.isAvailable, rhs.isAvailable) && MessagesPigeonInternal.deepEquals(lhs.printerStatus, rhs.printerStatus) && MessagesPigeonInternal.deepEquals(lhs.driverName, rhs.driverName) && MessagesPigeonInternal.deepEquals(lhs.portName, rhs.portName) && MessagesPigeonInternal.deepEquals(lhs.location, rhs.location) && MessagesPigeonInternal.deepEquals(lhs.makeAndModel, rhs.makeAndModel) && MessagesPigeonInternal.deepEquals(lhs.deviceUri, rhs.deviceUri)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -558,10 +600,16 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
     MessagesPigeonInternal.deepHash(value: isDefault, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: capabilities, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: isAvailable, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: printerStatus, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: driverName, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: portName, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: location, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: makeAndModel, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: deviceUri, hasher: &hasher)
   }
 
   public var description: String {
-    return "PrinterInfo(label: \(String(describing: label)), address: \(String(describing: address)), details: \(String(describing: details)), isDefault: \(String(describing: isDefault)), capabilities: \(String(describing: capabilities)), isAvailable: \(String(describing: isAvailable)))"
+    return "PrinterInfo(label: \(String(describing: label)), address: \(String(describing: address)), details: \(String(describing: details)), isDefault: \(String(describing: isDefault)), capabilities: \(String(describing: capabilities)), isAvailable: \(String(describing: isAvailable)), printerStatus: \(String(describing: printerStatus)), driverName: \(String(describing: driverName)), portName: \(String(describing: portName)), location: \(String(describing: location)), makeAndModel: \(String(describing: makeAndModel)), deviceUri: \(String(describing: deviceUri)))"
   }
 }
 
@@ -766,8 +814,12 @@ protocol FlutterPrintApi {
   /// **Android / iOS** — opens the system print UI for PDF; job id is assigned
   /// when the user confirms (same as [print] for images with immediate id).
   func printSubmit(filePath: String, options: PrintOptions?, completion: @escaping (Result<Int64, Error>) -> Void)
-  /// Cancels a queued job. Unsupported platforms throw [PlatformException].
-  func cancelPrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Void, Error>) -> Void)
+  /// Cancels a queued job. Returns `false` when the OS rejects the operation.
+  func cancelPrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Pauses a queued job. Returns `false` when unsupported or rejected.
+  func pausePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Resumes a paused job. Returns `false` when unsupported or rejected.
+  func resumePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -935,7 +987,7 @@ class FlutterPrintApiSetup {
     } else {
       printSubmitChannel.setMessageHandler(nil)
     }
-    /// Cancels a queued job. Unsupported platforms throw [PlatformException].
+    /// Cancels a queued job. Returns `false` when the OS rejects the operation.
     let cancelPrintJobChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.cancelPrintJob\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       cancelPrintJobChannel.setMessageHandler { message, reply in
@@ -944,8 +996,8 @@ class FlutterPrintApiSetup {
         let jobIdArg = args[1] as! Int64
         api.cancelPrintJob(printerAddress: printerAddressArg, jobId: jobIdArg) { result in
           switch result {
-          case .success:
-            reply(wrapResult(nil))
+          case .success(let res):
+            reply(wrapResult(res))
           case .failure(let error):
             reply(wrapError(error))
           }
@@ -953,6 +1005,44 @@ class FlutterPrintApiSetup {
       }
     } else {
       cancelPrintJobChannel.setMessageHandler(nil)
+    }
+    /// Pauses a queued job. Returns `false` when unsupported or rejected.
+    let pausePrintJobChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.pausePrintJob\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      pausePrintJobChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let printerAddressArg = args[0] as! String
+        let jobIdArg = args[1] as! Int64
+        api.pausePrintJob(printerAddress: printerAddressArg, jobId: jobIdArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      pausePrintJobChannel.setMessageHandler(nil)
+    }
+    /// Resumes a paused job. Returns `false` when unsupported or rejected.
+    let resumePrintJobChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      resumePrintJobChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let printerAddressArg = args[0] as! String
+        let jobIdArg = args[1] as! Int64
+        api.resumePrintJob(printerAddress: printerAddressArg, jobId: jobIdArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      resumePrintJobChannel.setMessageHandler(nil)
     }
   }
 }
