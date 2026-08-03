@@ -851,6 +851,7 @@ typedef struct {
   void (*cancel_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*pause_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
   void (*resume_print_job)(const gchar* printer_address, int64_t job_id, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
+  void (*set_default_printer)(const gchar* printer_address, FlutterPrintFlutterPrintApiResponseHandle* response_handle, gpointer user_data);
 } FlutterPrintFlutterPrintApiVTable;
 
 /**
@@ -1053,6 +1054,26 @@ void flutter_print_flutter_print_api_respond_resume_print_job(FlutterPrintFlutte
  * Responds with an error to FlutterPrintApi.resumePrintJob. 
  */
 void flutter_print_flutter_print_api_respond_error_resume_print_job(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * flutter_print_flutter_print_api_respond_set_default_printer:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to FlutterPrintApi.setDefaultPrinter. 
+ */
+void flutter_print_flutter_print_api_respond_set_default_printer(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value);
+
+/**
+ * flutter_print_flutter_print_api_respond_error_set_default_printer:
+ * @response_handle: a #FlutterPrintFlutterPrintApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to FlutterPrintApi.setDefaultPrinter. 
+ */
+void flutter_print_flutter_print_api_respond_error_set_default_printer(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
 
 G_END_DECLS
 

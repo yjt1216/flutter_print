@@ -690,6 +690,18 @@ class FlutterPrintApi {
     const std::string& printer_address,
     int64_t job_id,
     std::function<void(ErrorOr<bool> reply)> result) = 0;
+  // Sets the **operating-system** default printer queue.
+  //
+  // [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+  // Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+  // or the OS rejects the request.
+  //
+  // Apps that only need an in-app default (e.g. HeartMonitorx) can store
+  // [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+  // on each print.
+  virtual void SetDefaultPrinter(
+    const std::string& printer_address,
+    std::function<void(ErrorOr<bool> reply)> result) = 0;
 
   // The codec used by FlutterPrintApi.
   static const ::flutter::StandardMessageCodec& GetCodec();

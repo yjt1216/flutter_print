@@ -109,3 +109,9 @@ BOOL FlutterPrintCupsReleaseJob(NSString *_Nullable dest, int64_t jobId) {
   ipp_status_t st = cupsReleaseJob(d, (int)jobId);
   return st <= IPP_STATUS_OK_EVENTS_COMPLETE;
 }
+
+BOOL FlutterPrintCupsSetDefaultPrinter(NSString *dest) {
+  if (dest.length == 0) return NO;
+  ipp_status_t st = cupsSetDefault(dest.UTF8String);
+  return st <= IPP_STATUS_OK_EVENTS_COMPLETE;
+}

@@ -1807,6 +1807,35 @@ void FlutterPrintApi::SetUp(
       channel.SetMessageHandler(nullptr);
     }
   }
+  {
+    BasicMessageChannel<> channel(binary_messenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter" + prepended_suffix, &GetCodec());
+    if (api != nullptr) {
+      channel.SetMessageHandler([api](const EncodableValue& message, const ::flutter::MessageReply<EncodableValue>& reply) {
+        try {
+          const auto& args = std::get<EncodableList>(message);
+          const auto& encodable_printer_address_arg = args.at(0);
+          if (encodable_printer_address_arg.IsNull()) {
+            reply(WrapError("printer_address_arg unexpectedly null."));
+            return;
+          }
+          const auto& printer_address_arg = std::get<std::string>(encodable_printer_address_arg);
+          api->SetDefaultPrinter(printer_address_arg, [reply](ErrorOr<bool>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
+        } catch (const std::exception& exception) {
+          reply(WrapError(exception.what()));
+        }
+      });
+    } else {
+      channel.SetMessageHandler(nullptr);
+    }
+  }
 }
 
 EncodableValue FlutterPrintApi::WrapError(std::string_view error_message) {

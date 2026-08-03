@@ -205,6 +205,12 @@ public class FlutterPrintPlugin
     result.success(false);
   }
 
+  @Override
+  public void setDefaultPrinter(@NonNull String printerAddress,
+                                @NonNull Messages.Result<Boolean> result) {
+    result.success(false);
+  }
+
   private static int androidRawStatus(@NonNull PrintJob job) {
     if (job.isFailed()) return 7;
     if (job.isCancelled()) return 6;

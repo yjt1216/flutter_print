@@ -491,6 +491,13 @@ struct PrinterCapabilities: Hashable, CustomStringConvertible {
 
 /// Describes a single printer returned by [FlutterPrintApi.listPrinters].
 ///
+/// Use [label] / [address] for UI and [PrintOptions.printerAddress]. Optional
+/// metadata fields ([driverName], [portName], [makeAndModel], …) help identify
+/// the physical device or driver when building a **printer profile** (e.g.
+/// which fault-handling rules apply). They do not replace vendor SDK status
+/// codes — combine with [printerStatus], [isAvailable], and print-job status
+/// streams from the main `flutter_print` package.
+///
 /// Generated class from Pigeon that represents data sent in messages.
 struct PrinterInfo: Hashable, CustomStringConvertible {
   /// Human-readable display name shown to the user (e.g. `'HP LaserJet Pro'`).
@@ -504,8 +511,12 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
   /// - **iOS** — full AirPrint URL (e.g. `'ipp://printer.local/ipp/print'`).
   /// - **Android** — not set; the user selects the printer inside the dialog.
   var address: String? = nil
-  /// Optional longer description provided by the platform (e.g. the printer
-  /// model or location). May be `null`.
+  /// Optional extra text from the platform. Meaning varies by OS:
+  ///
+  /// - **Windows** — driver comment (`pComment`), not the same as [location].
+  /// - **Linux (CUPS)** — often `printer-location` when set.
+  ///
+  /// Prefer [makeAndModel] on CUPS for model identification. May be `null`.
   var details: String? = nil
   /// Whether this is the current system-default printer.
   var isDefault: Bool
@@ -520,22 +531,55 @@ struct PrinterInfo: Hashable, CustomStringConvertible {
   ///
   /// Platform support: macOS, Windows, Linux.
   var isAvailable: Bool? = nil
-  /// Raw platform printer status when available (Windows `PRINTER_STATUS_*`
-  /// bit mask). Parse for offline/paper-out etc. `null` when not reported.
+  /// Raw printer status from the spooler when the platform exposes it.
+  ///
+  /// **Windows:** bit mask (`PRINTER_STATUS_*`). In application code, parse with
+  /// helpers exported from the `flutter_print` package (`describePrinterStatus`,
+  /// `isBlockingOsPrinterStatus`, or `printWithStatus` with
+  /// `watchPrinterStatus: true`).
+  ///
+  /// **Other platforms:** usually `null`; rely on [isAvailable] on Linux/macOS.
+  ///
+  /// Not the same as per-job status — see [PrintJobInfo.rawStatus].
   var printerStatus: Int64? = nil
-  /// Installed driver name (Windows `pDriverName`). `null` when not reported.
+  /// Installed print driver name (Windows queue properties → Driver).
+  ///
+  /// Use to distinguish queues that share a similar [label] (e.g. PCL vs PS
+  /// driver for the same device) or to key a driver-based printer profile.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
   var driverName: String? = nil
-  /// Connection port (Windows `pPortName`, e.g. `USB001`, `WSD-…`). `null`
-  /// when not reported.
+  /// Port the queue is bound to (Windows `pPortName`).
+  ///
+  /// Examples: `USB001`, `WSD-…`, `IP_…`, `PORTPROMPT:` (virtual PDF/XPS).
+  /// Helps infer **connection type** (USB vs network vs virtual sink).
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
   var portName: String? = nil
-  /// Physical location string (Windows `pLocation`). Distinct from [details]
-  /// (often driver comment on Windows). `null` when not reported.
+  /// User-visible location string (Windows `pLocation`), e.g. room or site.
+  ///
+  /// Distinct from [details] on Windows (comment field). On Linux, location
+  /// may appear in [details] instead; [location] stays `null`.
+  ///
+  /// **Platform:** Windows only; `null` elsewhere.
   var location: String? = nil
-  /// Manufacturer/model string (CUPS `printer-make-and-model`). `null` when
-  /// not reported.
+  /// Manufacturer and model as reported by CUPS (`printer-make-and-model`),
+  /// e.g. `KONICA MINOLTA bizhub C458`.
+  ///
+  /// Primary field for **model-based printer profiles** on Linux. On Windows,
+  /// [label] often already contains the model; use [driverName] as a secondary
+  /// key.
+  ///
+  /// **Platform:** Linux (CUPS); `null` on Windows/macOS/iOS/Android unless
+  /// added later.
   var makeAndModel: String? = nil
-  /// Device URI (CUPS `device-uri`, e.g. `ipp://…`, `usb://…`). `null` when
-  /// not reported.
+  /// Backend device URI from CUPS (`device-uri`), e.g. `ipp://192.168.1.10/ipp/print`,
+  /// `usb://Vendor/Model?serial=…`, `socket://…`.
+  ///
+  /// Useful for debugging connectivity and telling IPP/USB/network backends
+  /// apart; not required for normal printing ([address] is the queue name).
+  ///
+  /// **Platform:** Linux (CUPS); `null` elsewhere.
   var deviceUri: String? = nil
 
 
@@ -820,6 +864,16 @@ protocol FlutterPrintApi {
   func pausePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
   /// Resumes a paused job. Returns `false` when unsupported or rejected.
   func resumePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Sets the **operating-system** default printer queue.
+  ///
+  /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+  /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+  /// or the OS rejects the request.
+  ///
+  /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+  /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+  /// on each print.
+  func setDefaultPrinter(printerAddress: String, completion: @escaping (Result<Bool, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1043,6 +1097,32 @@ class FlutterPrintApiSetup {
       }
     } else {
       resumePrintJobChannel.setMessageHandler(nil)
+    }
+    /// Sets the **operating-system** default printer queue.
+    ///
+    /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+    /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+    /// or the OS rejects the request.
+    ///
+    /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+    /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+    /// on each print.
+    let setDefaultPrinterChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      setDefaultPrinterChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let printerAddressArg = args[0] as! String
+        api.setDefaultPrinter(printerAddress: printerAddressArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      setDefaultPrinterChannel.setMessageHandler(nil)
     }
   }
 }

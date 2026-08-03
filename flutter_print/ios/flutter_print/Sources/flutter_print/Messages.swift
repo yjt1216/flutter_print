@@ -864,6 +864,16 @@ protocol FlutterPrintApi {
   func pausePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
   /// Resumes a paused job. Returns `false` when unsupported or rejected.
   func resumePrintJob(printerAddress: String, jobId: Int64, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Sets the **operating-system** default printer queue.
+  ///
+  /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+  /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+  /// or the OS rejects the request.
+  ///
+  /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+  /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+  /// on each print.
+  func setDefaultPrinter(printerAddress: String, completion: @escaping (Result<Bool, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1087,6 +1097,32 @@ class FlutterPrintApiSetup {
       }
     } else {
       resumePrintJobChannel.setMessageHandler(nil)
+    }
+    /// Sets the **operating-system** default printer queue.
+    ///
+    /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+    /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+    /// or the OS rejects the request.
+    ///
+    /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+    /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+    /// on each print.
+    let setDefaultPrinterChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      setDefaultPrinterChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let printerAddressArg = args[0] as! String
+        api.setDefaultPrinter(printerAddress: printerAddressArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      setDefaultPrinterChannel.setMessageHandler(nil)
     }
   }
 }

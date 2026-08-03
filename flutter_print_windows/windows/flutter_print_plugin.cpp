@@ -8,6 +8,7 @@
 #include <shellapi.h>
 #include <thread>
 #include <unordered_set>
+#include <vector>
 
 #pragma comment(lib, "winspool.lib")
 #pragma comment(lib, "shell32.lib")
@@ -439,6 +440,22 @@ void FlutterPrintPlugin::ResumePrintJob(
         ResumePrintJobOnPrinter(wPrinter, static_cast<int>(job_id));
     if (alive->load()) {
       result(ok);
+    }
+  }).detach();
+}
+
+// Sets the OS default printer queue ([PrinterInfo.address]).
+void FlutterPrintPlugin::SetDefaultPrinter(
+    const std::string& printer_address,
+    std::function<void(ErrorOr<bool> reply)> result) {
+  std::thread([printer_address, result = std::move(result),
+               alive = alive_]() {
+    const std::wstring wName = Utf8ToWide(printer_address);
+    std::vector<wchar_t> buf(wName.begin(), wName.end());
+    buf.push_back(L'\0');
+    const BOOL ok = ::SetDefaultPrinterW(buf.data());
+    if (alive->load()) {
+      result(static_cast<bool>(ok));
     }
   }).detach();
 }

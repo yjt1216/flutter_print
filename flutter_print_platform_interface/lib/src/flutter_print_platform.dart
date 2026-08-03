@@ -81,4 +81,9 @@ abstract class FlutterPrintPlatform extends PlatformInterface {
   Future<bool> resumePrintJob(String printerAddress, int jobId) {
     throw UnimplementedError('resumePrintJob() has not been implemented.');
   }
+
+  /// Sets the OS default printer queue. Unsupported on mobile and Web.
+  Future<bool> setDefaultPrinter(String printerAddress) {
+    throw UnimplementedError('setDefaultPrinter() has not been implemented.');
+  }
 }

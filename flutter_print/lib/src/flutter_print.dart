@@ -164,6 +164,14 @@ class FlutterPrint {
   /// System default printer from [listPrinters], if any.
   static Future<PrinterInfo?> getDefaultPrinter() => ph.getDefaultPrinter();
 
+  /// Sets the **OS** default printer queue ([PrinterInfo.address]).
+  ///
+  /// Returns `false` on Android, iOS, and Web. Prefer storing the user's
+  /// printer in app settings if you do not need to change the system default.
+  static Future<bool> setDefaultPrinter(String printerAddress) {
+    return FlutterPrintPlatform.instance.setDefaultPrinter(printerAddress);
+  }
+
   static Future<String?> resolvePrinterAddress(String nameOrAddress) =>
       ph.resolvePrinterAddress(nameOrAddress);
 

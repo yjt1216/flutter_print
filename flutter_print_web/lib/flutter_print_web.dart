@@ -64,6 +64,9 @@ class FlutterPrintWeb extends FlutterPrintPlatform {
   @override
   Future<bool> resumePrintJob(String printerAddress, int jobId) async => false;
 
+  @override
+  Future<bool> setDefaultPrinter(String printerAddress) async => false;
+
   // ---------------------------------------------------------------------------
 
   Future<void> _printUrl(String url) async {

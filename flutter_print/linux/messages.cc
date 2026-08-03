@@ -2167,6 +2167,45 @@ static FlutterPrintFlutterPrintApiResumePrintJobResponse* flutter_print_flutter_
   return self;
 }
 
+G_DECLARE_FINAL_TYPE(FlutterPrintFlutterPrintApiSetDefaultPrinterResponse, flutter_print_flutter_print_api_set_default_printer_response, FLUTTER_PRINT, FLUTTER_PRINT_API_SET_DEFAULT_PRINTER_RESPONSE, GObject)
+
+struct _FlutterPrintFlutterPrintApiSetDefaultPrinterResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(FlutterPrintFlutterPrintApiSetDefaultPrinterResponse, flutter_print_flutter_print_api_set_default_printer_response, G_TYPE_OBJECT)
+
+static void flutter_print_flutter_print_api_set_default_printer_response_dispose(GObject* object) {
+  FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_SET_DEFAULT_PRINTER_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(flutter_print_flutter_print_api_set_default_printer_response_parent_class)->dispose(object);
+}
+
+static void flutter_print_flutter_print_api_set_default_printer_response_init(FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* self) {
+}
+
+static void flutter_print_flutter_print_api_set_default_printer_response_class_init(FlutterPrintFlutterPrintApiSetDefaultPrinterResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = flutter_print_flutter_print_api_set_default_printer_response_dispose;
+}
+
+static FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* flutter_print_flutter_print_api_set_default_printer_response_new(gboolean return_value) {
+  FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_SET_DEFAULT_PRINTER_RESPONSE(g_object_new(flutter_print_flutter_print_api_set_default_printer_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_bool(return_value));
+  return self;
+}
+
+static FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* flutter_print_flutter_print_api_set_default_printer_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  FlutterPrintFlutterPrintApiSetDefaultPrinterResponse* self = FLUTTER_PRINT_FLUTTER_PRINT_API_SET_DEFAULT_PRINTER_RESPONSE(g_object_new(flutter_print_flutter_print_api_set_default_printer_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
 struct _FlutterPrintFlutterPrintApi {
   GObject parent_instance;
 
@@ -2326,6 +2365,19 @@ static void flutter_print_flutter_print_api_resume_print_job_cb(FlBasicMessageCh
   self->vtable->resume_print_job(printer_address, job_id, handle, self->user_data);
 }
 
+static void flutter_print_flutter_print_api_set_default_printer_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  FlutterPrintFlutterPrintApi* self = FLUTTER_PRINT_FLUTTER_PRINT_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->set_default_printer == nullptr) {
+    return;
+  }
+
+  FlValue* value0 = fl_value_get_list_value(message_, 0);
+  const gchar* printer_address = fl_value_get_string(value0);
+  g_autoptr(FlutterPrintFlutterPrintApiResponseHandle) handle = flutter_print_flutter_print_api_response_handle_new(channel, response_handle);
+  self->vtable->set_default_printer(printer_address, handle, self->user_data);
+}
+
 void flutter_print_flutter_print_api_set_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix, const FlutterPrintFlutterPrintApiVTable* vtable, gpointer user_data, GDestroyNotify user_data_free_func) {
   g_autofree gchar* dot_suffix = suffix != nullptr ? g_strdup_printf(".%s", suffix) : g_strdup("");
   g_autoptr(FlutterPrintFlutterPrintApi) api_data = flutter_print_flutter_print_api_new(vtable, user_data, user_data_free_func);
@@ -2358,6 +2410,9 @@ void flutter_print_flutter_print_api_set_method_handlers(FlBinaryMessenger* mess
   g_autofree gchar* resume_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) resume_print_job_channel = fl_basic_message_channel_new(messenger, resume_print_job_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(resume_print_job_channel, flutter_print_flutter_print_api_resume_print_job_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* set_default_printer_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) set_default_printer_channel = fl_basic_message_channel_new(messenger, set_default_printer_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(set_default_printer_channel, flutter_print_flutter_print_api_set_default_printer_cb, g_object_ref(api_data), g_object_unref);
 }
 
 void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix) {
@@ -2391,6 +2446,9 @@ void flutter_print_flutter_print_api_clear_method_handlers(FlBinaryMessenger* me
   g_autofree gchar* resume_print_job_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.resumePrintJob%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) resume_print_job_channel = fl_basic_message_channel_new(messenger, resume_print_job_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(resume_print_job_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* set_default_printer_channel_name = g_strdup_printf("dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) set_default_printer_channel = fl_basic_message_channel_new(messenger, set_default_printer_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(set_default_printer_channel, nullptr, nullptr, nullptr);
 }
 
 void flutter_print_flutter_print_api_respond_print(FlutterPrintFlutterPrintApiResponseHandle* response_handle) {
@@ -2534,5 +2592,21 @@ void flutter_print_flutter_print_api_respond_error_resume_print_job(FlutterPrint
   g_autoptr(GError) error = nullptr;
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "resumePrintJob", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_set_default_printer(FlutterPrintFlutterPrintApiResponseHandle* response_handle, gboolean return_value) {
+  g_autoptr(FlutterPrintFlutterPrintApiSetDefaultPrinterResponse) response = flutter_print_flutter_print_api_set_default_printer_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "setDefaultPrinter", error->message);
+  }
+}
+
+void flutter_print_flutter_print_api_respond_error_set_default_printer(FlutterPrintFlutterPrintApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(FlutterPrintFlutterPrintApiSetDefaultPrinterResponse) response = flutter_print_flutter_print_api_set_default_printer_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "FlutterPrintApi", "setDefaultPrinter", error->message);
   }
 }

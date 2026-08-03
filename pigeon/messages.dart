@@ -432,4 +432,16 @@ abstract class FlutterPrintApi {
   /// Resumes a paused job. Returns `false` when unsupported or rejected.
   @async
   bool resumePrintJob(String printerAddress, int jobId);
+
+  /// Sets the **operating-system** default printer queue.
+  ///
+  /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+  /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+  /// or the OS rejects the request.
+  ///
+  /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+  /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+  /// on each print.
+  @async
+  bool setDefaultPrinter(String printerAddress);
 }

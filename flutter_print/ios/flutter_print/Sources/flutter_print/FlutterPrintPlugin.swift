@@ -87,6 +87,11 @@ extension FlutterPrintPlugin: FlutterPrintApi {
                       completion: @escaping (Result<Bool, any Error>) -> Void) {
     completion(.success(false))
   }
+
+  func setDefaultPrinter(printerAddress: String,
+                        completion: @escaping (Result<Bool, any Error>) -> Void) {
+    completion(.success(false))
+  }
 }
 
 // MARK: - Private

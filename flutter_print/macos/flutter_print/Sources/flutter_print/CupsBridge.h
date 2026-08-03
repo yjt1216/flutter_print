@@ -25,4 +25,7 @@ BOOL FlutterPrintCupsCancelJob(NSString *_Nullable dest, int64_t jobId);
 BOOL FlutterPrintCupsHoldJob(NSString *_Nullable dest, int64_t jobId);
 BOOL FlutterPrintCupsReleaseJob(NSString *_Nullable dest, int64_t jobId);
 
+/// Sets the CUPS default destination (queue name).
+BOOL FlutterPrintCupsSetDefaultPrinter(NSString *dest);
+
 NS_ASSUME_NONNULL_END

@@ -1685,6 +1685,18 @@ public class Messages {
     void pausePrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull Result<Boolean> result);
     /** Resumes a paused job. Returns `false` when unsupported or rejected. */
     void resumePrintJob(@NonNull String printerAddress, @NonNull Long jobId, @NonNull Result<Boolean> result);
+    /**
+     * Sets the **operating-system** default printer queue.
+     *
+     * [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+     * Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+     * or the OS rejects the request.
+     *
+     * Apps that only need an in-app default (e.g. HeartMonitorx) can store
+     * [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+     * on each print.
+     */
+    void setDefaultPrinter(@NonNull String printerAddress, @NonNull Result<Boolean> result);
 
     /** The codec used by FlutterPrintApi. */
     static @NonNull MessageCodec<Object> getCodec() {
@@ -1954,6 +1966,35 @@ public class Messages {
                     };
 
                 api.resumePrintJob(printerAddressArg, jobIdArg, resultCallback);
+              });
+        } else {
+          channel.setMessageHandler(null);
+        }
+      }
+      {
+        BasicMessageChannel<Object> channel =
+            new BasicMessageChannel<>(
+                binaryMessenger, "dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter" + messageChannelSuffix, getCodec());
+        if (api != null) {
+          channel.setMessageHandler(
+              (message, reply) -> {
+                ArrayList<Object> wrapped = new ArrayList<>();
+                ArrayList<Object> args = (ArrayList<Object>) message;
+                String printerAddressArg = (String) args.get(0);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setDefaultPrinter(printerAddressArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);

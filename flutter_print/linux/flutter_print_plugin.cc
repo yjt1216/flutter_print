@@ -614,6 +614,25 @@ static void handle_resume_print_job(
 #endif
 }
 
+static void handle_set_default_printer(
+    const gchar* printer_address,
+    FlutterPrintFlutterPrintApiResponseHandle* response_handle,
+    gpointer user_data) {
+#ifdef HAS_CUPS
+  if (!printer_address || printer_address[0] == '\0') {
+    flutter_print_flutter_print_api_respond_set_default_printer(response_handle,
+                                                                FALSE);
+    return;
+  }
+  ipp_status_t status = cupsSetDefault(printer_address);
+  flutter_print_flutter_print_api_respond_set_default_printer(
+      response_handle, status <= IPP_STATUS_OK_EVENTS_COMPLETE ? TRUE : FALSE);
+#else
+  flutter_print_flutter_print_api_respond_set_default_printer(response_handle,
+                                                              FALSE);
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // Plugin registration
 // ---------------------------------------------------------------------------
@@ -628,6 +647,7 @@ static const FlutterPrintFlutterPrintApiVTable kApiVTable = {
     .cancel_print_job  = handle_cancel_print_job,
     .pause_print_job   = handle_pause_print_job,
     .resume_print_job  = handle_resume_print_job,
+    .set_default_printer = handle_set_default_printer,
 };
 
 void flutter_print_plugin_register_with_registrar(

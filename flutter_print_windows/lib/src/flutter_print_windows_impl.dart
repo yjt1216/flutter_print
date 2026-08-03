@@ -46,4 +46,8 @@ class FlutterPrintWindowsImpl extends FlutterPrintPlatform {
   @override
   Future<bool> resumePrintJob(String printerAddress, int jobId) =>
       _api.resumePrintJob(printerAddress, jobId);
+
+  @override
+  Future<bool> setDefaultPrinter(String printerAddress) =>
+      _api.setDefaultPrinter(printerAddress);
 }

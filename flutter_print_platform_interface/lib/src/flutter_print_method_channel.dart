@@ -42,4 +42,8 @@ class MethodChannelFlutterPrint extends FlutterPrintPlatform {
   @override
   Future<bool> resumePrintJob(String printerAddress, int jobId) =>
       api.resumePrintJob(printerAddress, jobId);
+
+  @override
+  Future<bool> setDefaultPrinter(String printerAddress) =>
+      api.setDefaultPrinter(printerAddress);
 }

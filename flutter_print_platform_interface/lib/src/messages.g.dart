@@ -984,4 +984,32 @@ class FlutterPrintApi {
     ;
     return pigeonVar_replyValue! as bool;
   }
+
+  /// Sets the **operating-system** default printer queue.
+  ///
+  /// [printerAddress] must be the spooler queue name ([PrinterInfo.address] on
+  /// Windows/Linux/macOS). Returns `false` when unsupported (Android, iOS, Web)
+  /// or the OS rejects the request.
+  ///
+  /// Apps that only need an in-app default (e.g. HeartMonitorx) can store
+  /// [printerAddress] in preferences instead and pass [PrintOptions.printerAddress]
+  /// on each print.
+  Future<bool> setDefaultPrinter(String printerAddress) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.flutter_print_platform_interface.FlutterPrintApi.setDefaultPrinter$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[printerAddress]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
+    return pigeonVar_replyValue! as bool;
+  }
 }
